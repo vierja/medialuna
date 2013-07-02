@@ -4,7 +4,7 @@
 #define YYSTYPE Token // tipo de yylval
 %}
 
-%start program
+%start chunk
 
 %token TK_ID
 %token TK_NUMBER_INT
@@ -68,54 +68,112 @@
 
 %%
 
-program     : /* vacio - un programa vacio es valido */
-            | block
+/* Creado a partir de http://lua-users.org/wiki/LuaGrammar */
+
+chunk       : block ;
+
+semi        :
+            | TK_OP_SEMICOLON
             ;
 
-block       : /* vacio */
-            | stat opt_colon block
-            | laststat opt_colon
+block       : scope statlist
+            | scope statlist laststat semi
             ;
 
-stat        : varlist TK_OP_ASSIGN explist
-            | funcall
-            | TK_KW_DO block TK_KW_END
+ublock      : block TK_KW_UNTIL exp ;
+
+scope       :
+            | scope statlist binding semi
+            ;
+
+statlist    :
+            | statlist stat semi
+            ;
+
+stat        : TK_KW_DO block TK_KW_END
             | TK_KW_WHILE exp TK_KW_UNTIL block TK_KW_END
-            | TK_KW_REPEAT block TK_KW_UNTIL exp
-            | TK_KW_IF exp TK_KW_THEN block elseif_list opt_else TK_KW_END
-            | TK_KW_FOR TK_ID TK_OP_ASSIGN exp TK_OP_COMA exp opt_com_exp TK_KW_DO block TK_KW_END
+            | repetition TK_KW_DO block TK_KW_END
+            | TK_KW_REPEAT ublock
+            | TK_KW_IF conds TK_KW_END
             | TK_KW_FUNCTION funcname funcbody
+            | setlist TK_OP_ASSIGN explist1
+            | functioncal
+            ;
+
+repetition  : TK_KW_FOR TK_ID TK_OP_ASSIGN explist23
+            | TK_KW_FOR namelist TK_KW_IN explist1
+            ;
+
+conds       : condlist
+            | condlist TK_KW_ELSE block
+            ;
+
+condlist    : cond
+            | condlist TK_KW_ELSEIF cond
+            ;
+
+cond        : exp TK_KW_THEN block ;
+
+laststat    : TK_KW_BREAK
+            | TK_KW_RETURN
+            | TK_KW_RETURN explist1
+            ;
+
+binding     : TK_KW_LOCAL namelist
+            | TK_KW_LOCAL namelist TK_OP_ASSIGN explist1
             | TK_KW_LOCAL TK_KW_FUNCTION TK_ID funcbody
-            | TK_KW_LOCAL namelist opt_explist
             ;
 
-elseif_list : /* vacio */
-            | TK_KW_ELSEIF exp TK_KW_THEN block elseif_list
+funcname    : dottedname
+            | dottedname TK_OP_COLON TK_ID
             ;
 
-opt_else    : /* vacio */
-            | TK_KW_ELSE block
+dottedname  : TK_ID
+            | dottedname TK_OP_DOT TK_ID
             ;
 
-laststat    : TK_KW_RETURN
-            | TK_KW_RETURN explist
-            | TK_KW_BREAK
+namelist    : TK_ID
+            | namelist TK_OP_COMA TK_ID
             ;
 
-funcname    : TK_ID list_name op_colon_na;
-
-list_name   : /* vacio */
-            | TK_OP_DOT TK_ID
+explist1    : exp
+            | explist1 TK_OP_COMA exp
             ;
 
-op_colon_na : /* vacio */
-            | TK_OP_COLON
+explist23   : exp TK_OP_COMA exp
+            | exp TK_OP_COMA exp TK_OP_COMA exp
             ;
 
-varlist     : var list_var;
+exp         : TK_KW_NIL
+            | TK_BOOLEAN
+            | TK_NUMBER_INT
+            | TK_NUMBER_DOUBLE
+            | TK_OP_ELIPSIS
+            | function
+            | prefixexp
+            | tableconstr
+            | TK_KW_NOT exp
+            | TK_OP_HASH exp
+            | TK_OP_MINUS exp
+            | exp TK_KW_AND exp
+            | exp TK_KW_OR exp
+            | exp TK_OP_MIN exp
+            | exp TK_OP_MIN_EQUALS exp
+            | exp TK_OP_GRT exp
+            | exp TK_OP_GRT_EQUALS exp
+            | exp TK_OP_EQUALS exp
+            | exp TK_OP_DIFF exp
+            | exp TK_OP_DOTDOT exp
+            | exp TK_OP_PLUS exp
+            | exp TK_OP_MINUS exp
+            | exp TK_OP_TIMES exp
+            | exp TK_OP_DIVIDED exp
+            | exp TK_OP_MOD exp
+            | exp TK_OP_EXP exp
+            ;
 
-list_var    : /* vacio */
-            | TK_OP_COMA var
+setlist     : var
+            | setlist TK_OP_COMA var
             ;
 
 var         : TK_ID
@@ -123,107 +181,44 @@ var         : TK_ID
             | prefixexp TK_OP_DOT TK_ID
             ;
 
-namelist    : TK_ID l_namelist;
-
-explist     : exp_comm_li exp;
-
-exp_comm_li : /* vacio */
-            | TK_OP_COMA exp exp_comm_li
-            ;
-
-exp         : TK_KW_NIL
-            | TK_BOOLEAN
-            | TK_NUMBER_INT
-            | TK_NUMBER_DOUBLE
-            | TK_ID
-            | TK_OP_ELIPSIS
-            | function
-            | prefixexp
-            | tableconstr
-            | exp binop exp
-            | unop exp
-            ;
-
 prefixexp   : var
-            | funcall
+            | functioncal
             | TK_OP_OPEN_PAREN exp TK_OP_CLOS_PAREN
             ;
 
-funcall     : prefixexp args
+functioncal : prefixexp args
             | prefixexp TK_OP_COLON TK_ID args
             ;
 
-args        : TK_OP_OPEN_PAREN TK_OP_CLOS_PAREN block TK_KW_END
-            | TK_OP_OPEN_PAREN explist TK_OP_CLOS_PAREN block TK_KW_END
+args        : TK_OP_OPEN_PAREN TK_OP_CLOS_PAREN
+            | TK_OP_OPEN_PAREN explist1 TK_OP_CLOS_PAREN
+            | tableconstr
+            | TK_STRING
             ;
 
-function    : TK_KW_FUNCTION funcbody;
+function    : TK_KW_FUNCTION funcbody ;
 
-funcbody    : TK_OP_OPEN_PAREN TK_OP_CLOS_PAREN block TK_KW_END
-            | TK_OP_OPEN_PAREN parlist TK_OP_CLOS_PAREN block TK_KW_END
-            ;
+funcbody    : params block TK_KW_END ;
 
-parlist     : namelist
-            | namelist TK_OP_DOT TK_OP_ELIPSIS
+params      : TK_OP_OPEN_PAREN parlist TK_OP_CLOS_PAREN ;
+
+parlist     :
+            | namelist
             | TK_OP_ELIPSIS
+            | namelist TK_OP_COMA TK_OP_ELIPSIS
             ;
 
 tableconstr : TK_OP_OPEN_BRACE TK_OP_CLOS_BRACE
             | TK_OP_OPEN_BRACE fieldlist TK_OP_CLOS_BRACE
-            ;
+            ; /* TODO: Falta una que no entendi */
 
-fieldlist   : field fieldlist_o
-            | field fieldlist_o fieldsep
-            ;
+fieldlist   : field
+            | fieldlist TK_OP_COMA field
+            ; /* TODO: Falta una que no entendi. */
 
-fieldlist_o :
-            | fieldsep field fieldlist_o
-            ;
-
-field       : TK_OP_OPEN_BRACK exp TK_OP_CLOS_BRACK TK_OP_ASSIGN exp
+field       : exp
             | TK_ID TK_OP_ASSIGN exp
-            | exp
-            ;
-
-fieldsep    : TK_OP_COMA
-            | TK_OP_SEMICOLON
-            ;
-
-binop       : TK_OP_PLUS
-            | TK_OP_MINUS
-            | TK_OP_TIMES
-            | TK_OP_DIVIDED
-            | TK_OP_MOD
-            | TK_OP_EXP
-            | TK_OP_EQUALS
-            | TK_OP_DIFF
-            | TK_OP_MIN_EQUALS
-            | TK_OP_GRT_EQUALS
-            | TK_OP_MIN
-            | TK_OP_GRT
-            | TK_KW_AND
-            | TK_KW_OR
-            ;
-
-unop        : TK_OP_MINUS
-            | TK_KW_NOT
-            | TK_OP_HASH
-            ;
-
-l_namelist  : /* vacio */
-            | TK_OP_COMA TK_ID
-            ;
-
-opt_colon   : /* vacio */
-            | TK_OP_SEMICOLON
-            ;
-
-opt_explist : /* vacio */
-            | TK_OP_ASSIGN explist
-            ;
-
-opt_com_exp : /* vacio */
-            | TK_OP_COMA exp
+            | TK_OP_OPEN_BRACK exp TK_OP_CLOS_BRACK TK_OP_ASSIGN exp
             ;
 
 %%
