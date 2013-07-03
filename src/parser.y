@@ -12,8 +12,6 @@
     int errors;
 %}
 
-%option debug
-%option c++
 
 %union {
     Node *node;
@@ -130,29 +128,39 @@ block       : scope statlist
 scope       : { $$ = new StatementList();}
             | scope statlist binding semi
             {
+                /* cualquiera de las dos listas pueden ser vacias. */
                 /* itero sobre statlist para agregar a scope. */
                 for(std::vector<T>::iterator it = $<statlist>2.begin(); it != $<statlist>2.end(); ++it) {
                     $1->push_back(it);
                 }
                 /* finalmente agregando binding (definiciones local) */
-                $1->push_back($<binding>3);
-                /* Borro statlist para no dejar memoria colgada. */
+                for(std::vector<T>::iterator it = $<binding>3.begin(); it != $<binding>3.end(); ++it) {
+                    $1->push_back(it);
+                }
+                /* Borro statlist y binding para no dejar memoria colgada. */
                 delete $2;
+                delete $3;
             }
             ;
 
 statlist    : { $$ = new StatementList(); /* Creo una lista vacia */ } 
-            | statlist stat semi { $1->push_back($<stat>2); /* La populo poniendo siempre al final. */}
+            | statlist stat semi
+            {
+                $1->push_back($<stat>2);
+                /* La populo poniendo siempre al final. */
+            }
             ;
 
 identifier  : TK_ID
             {
-                $$ = new NIdentifier(*$1); delete $1; 
+                $$ = new NIdentifier(*$1);
+                delete $1; /* TODO : Porque delete? */
             }
 
 stat        : repetition TK_KW_DO block TK_KW_END
             {
-                $1->block = $<block>3; /* Luego de crear repetition agrego block.*/
+                $1->block = $<block>3;
+                /* Luego de crear repetition agrego block. */
             }
             | TK_KW_IF conds TK_KW_END
             {
@@ -164,14 +172,16 @@ stat        : repetition TK_KW_DO block TK_KW_END
             }
             | setlist TK_OP_ASSIGN explist1
             {
-                $$ = new NMultiAssignment($1, $2);
+                $$ = new NMultiAssignment($1, $2, 0);
+                /* El 0 es porque NO es ```local```. */
                 /* Borro las listas generadas */
                 delete $1;
                 delete $2;
             }
             | functioncal
             {
-
+                /* Se crea en su regla */
+                $$ = $1;
             }
             ;
 
@@ -195,73 +205,191 @@ condlist    : cond
 
 cond        : exp TK_KW_THEN block ;
 
-laststat    : TK_KW_BREAK { $$ = new NLastStatement(1); }
-            | TK_KW_RETURN { $$ = new NLastStatement(0); }
-            | TK_KW_RETURN explist1 { $$ = new NLastStatement($<explist1>1); }
+laststat    : TK_KW_BREAK
+            {
+                $$ = new NLastStatement(1);
+                /* se pasa por parametro si es BREAK */
+            }
+            | TK_KW_RETURN
+            {
+                $$ = new NLastStatement(0);
+                /* o si no lo es. */
+            }
+            | TK_KW_RETURN explist1
+            {
+                /* Si devuelve algo entonces es impliciamente return. */ 
+                $$ = new NLastStatement($<explist1>1);
+            }
             ;
 
-binding     : TK_KW_LOCAL namelist {$$ = }
+binding     : TK_KW_LOCAL namelist
+            {
+                $$ = new NMultiVariableDeclaration(1);
+                $$->isList = $2;
+                delete $2;
+            }
             | TK_KW_LOCAL namelist TK_OP_ASSIGN explist1
+            {
+                /*
+                    namelist es IdentifierList
+                    explist1 es ExpressionList
+                */
+                $$ = new NMultiAssignment($1, $2, 1);
+                /* el 1 es porque es ```local``` */
+                /* Borro las listas generadas */
+                delete $1;
+                delete $2;
+            }
             ;
 
 namelist    : identifier
             {
-                $$ = new IdentifierList(); $$->push_back($1);
+                /* inicio de lista, minimo un identifier */
+                $$ = new IdentifierList();
+                $$->push_back($1);
             }
             | namelist TK_OP_COMA identifier
             {
-                $1->push_back(*3); /* armo la lista*/
+                $1->push_back($3); /* armo la lista*/
             }
             ;
 
 explist1    : exp
+            {   
+                /* tiene largo minimo 3. */
+                $$ = new ExpressionList();
+                $$->push_back($1);
+            }
             | explist1 TK_OP_COMA exp
+            {
+                $1->push_back($3);
+                /* armo la lista de expresiones. */
+            }
             ;
 
 explist23   : exp TK_OP_COMA exp
+            {
+                /*
+                    TODO: Ver si es necesario crear un nuevo nodo o si esta bien
+                    usar una lista normal y saber que tiene largo 2 o 3.
+                */
+                $$ = new ExpressionList();
+                $$->push_back($1);
+                $$->push_back($3);
+            }
             | exp TK_OP_COMA exp TK_OP_COMA exp
+            {
+                $$ = new ExpressionList();
+                $$->push_back($1);
+                $$->push_back($3);
+                $$->push_back($5);
+            }
             ;
 
 exp         : TK_KW_NIL
+            {
+                $$ = new NNil();
+            }
             | TK_BOOLEAN
+            {
+                /* chanchada */
+                $$ = new NBoolean($1 == "true");
+            }
             | TK_NUMBER_INT
+            {
+                $$ = new NInteger(atol($1->c_str()));
+            }
             | TK_NUMBER_DOUBLE
+            {
+                $$ = new NDouble(atof($1->c_str()));
+            }
             | TK_OP_ELIPSIS
+            {
+                /* No hay que implementarlas */
+            }
             | function
+            {
+                $$ = $1;   
+            }
             | prefixexp
+            {
+                /* TODO : Complicado */
+            }
             | tableconstr
+            {
+                /* TODO : No me quiero meter con tablas por ahora. */
+            }
             | TK_KW_NOT exp
+            {
+                $$ = new NUnaryOperator($2, $1);
+            }
             | TK_OP_HASH exp
+            {
+                /* No hay que usarla. */
+            }
             | TK_OP_MINUS exp
-            | exp TK_KW_AND exp
-            | exp TK_KW_OR exp
-            | exp TK_OP_MIN exp
-            | exp TK_OP_MIN_EQUALS exp
-            | exp TK_OP_GRT exp
-            | exp TK_OP_GRT_EQUALS exp
-            | exp TK_OP_EQUALS exp
-            | exp TK_OP_DIFF exp
-            | exp TK_OP_DOTDOT exp
-            | exp TK_OP_PLUS exp
-            | exp TK_OP_MINUS exp
-            | exp TK_OP_TIMES exp
-            | exp TK_OP_DIVIDED exp
-            | exp TK_OP_MOD exp
-            | exp TK_OP_EXP exp
+            {
+                $$ = new NUnaryOperator($2, $1);
+            }
+            | exp binaryop exp
+            {
+                $$ = NBinaryOperator($2, $1, $3)
+            }
+            ;
+
+binaryop    : TK_KW_AND | TK_KW_OR | TK_OP_MIN | TK_OP_MIN_EQUALS | TK_OP_GRT
+            | TK_OP_GRT_EQUALS | TK_OP_EQUALS | TK_OP_DIFF | TK_OP_DOTDOT
+            | TK_OP_PLUS | TK_OP_MINUS | TK_OP_TIMES | TK_OP_DIVIDED
+            | TK_OP_MOD | TK_OP_EXP
             ;
 
 setlist     : var
+            {
+                $$ = new IdentifierList();
+                $$->push_back($1);
+            }
             | setlist TK_OP_COMA var
+            {
+                $1->push_back($3);
+            }
             ;
 
 var         : identifier
+            {
+                $$ = $1
+            }
             | prefixexp TK_OP_OPEN_BRACK exp TK_OP_CLOS_BRACK
+            {
+                /* Falta manejo de tablas. */
+            }
             | prefixexp TK_OP_DOT identifier
+            {
+                /* Creo que no se debe implementar */
+                /* TODO: CHEQUEAR */
+            }
             ;
 
 prefixexp   : var
+            {
+                /*
+                    var es de tipo NIdentifier : NExpression (sin soporte a tablas)
+                */
+                $$ = $1
+            }
             | functioncal
+            {
+                /* 
+                    functioncall es de tipo NFunctionCall : NExpression
+                */
+                $$ = $1
+            }
             | TK_OP_OPEN_PAREN exp TK_OP_CLOS_PAREN
+            {
+                /*
+                    exp obviamente es de tipo NExpresion, pueden ser varios.
+                */
+                $$ = $1
+            }
             ;
 
 functioncal : prefixexp args
@@ -271,6 +399,9 @@ functioncal : prefixexp args
                 delete $2;
             }
             | prefixexp TK_OP_COLON identifier args
+            {
+                /* No es obligatoria. */
+            }
             ;
 
 args        : TK_OP_OPEN_PAREN TK_OP_CLOS_PAREN
@@ -307,6 +438,7 @@ params      : TK_OP_OPEN_PAREN namelist TK_OP_CLOS_PAREN
             }
             ;
 
+/* Ignoramos las tables hasta tener una version funcionando */
 tableconstr : TK_OP_OPEN_BRACE TK_OP_CLOS_BRACE
             | TK_OP_OPEN_BRACE fieldlist TK_OP_CLOS_BRACE
             ; /* TODO: Falta una que no entendi */

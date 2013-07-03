@@ -27,8 +27,21 @@ class NExpression : public Node {
 class NStatement : public Node {
 };
 
-class NStatement : public Node {
+/*
+    Valor Nil.
+    Se podria usar un enum o algo ya que no tiene valor.
+    Pero ta.
+    Es lo que hay.
+*/
+class NNil : public NExpression {
+public:
+    NInteger() : { }
+};
 
+class NBoolean : public NExpression {
+public:
+    int trueVal;
+    NBoolean(int trueVal) : trueVal(trueVal) { }
 };
 
 class NInteger : public NExpression {
@@ -114,19 +127,26 @@ public:
 
     Creo que idList.length() >= expresionList.length()
 */
-class NMultiAssignment : public NExpression {
+class NMultiAssignment : public NStatement {
 public:
     IdentifierList idList;
     ExpressionList expresionList;
-    NMultiAssignment(IdentifierList idList, ExpressionList expresionList) :
-        idList(idList), expresionList(expresionList) { }
+    int isLocal;
+    NMultiAssignment(IdentifierList idList, ExpressionList expresionList, int isLocal) :
+        idList(idList), expresionList(expresionList) isLocal(isLocal) { }
 };
 
+/*
+    Bloque general.
+    Tiene una lista de statements y un lastStatment (opcional)
+
+*/
 class NBlock : public NExpression {
 public:
     StatementList statements;
-    NLastStatement& lastStatement
-    NBlock(lastStatement) :
+    NLastStatement& lastStatement;
+    NBlock(): {} /* constructor sin lastStatment */
+    NBlock(lastStatement) : /* constructor con lastStatment */
         lastStatement(lastStatement) { }
 };
 
@@ -152,9 +172,11 @@ public:
 class NMultiVariableDeclaration : public NStatement {
 public:
     IdentifierList idList;
-    ExpressionList assignExpresionList;
-    NMultiVariableDeclaration(IdentifierList idList, ExpressionList assignExpresionList):
-        idList(idList), assignExpresionList(assignExpresionList) { }
+    int isLocal;
+    NMultiVariableDeclaration(int isLocal):
+        isLocal(isLocal) { }
+    NMultiVariableDeclaration(IdentifierList idList):
+        idList(idList) { }
 
 };
 
