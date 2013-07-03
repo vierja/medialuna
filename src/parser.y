@@ -19,32 +19,23 @@
     NExpression *expr;
     NStatement *stmt;
     NIdentifier *ident;
+    NLastStatement *laststat;
     NVariableDeclaration *var_decl;
     std::vector<NVariableDeclaration*> *varvec;
     std::vector<NExpression*> *exprvec;
+    std::vector<NStatement*> *statvec;
+    std::vector<NIdentifier*> *idvec;
+    std::vector<NExpression*> *expvec;
     std::string *string;
     int token;
 }
 
-%token TK_ID
-%token TK_NUMBER_INT
-%token TK_NUMBER_DOUBLE
-%token TK_STRING
-%token TK_BOOLEAN
-%token TK_OP_PLUS
-%token TK_OP_MINUS
-%token TK_OP_TIMES
-%token TK_OP_DIVIDED
-%token TK_OP_MOD
-%token TK_OP_EXP
-%token TK_OP_HASH
-%token TK_OP_EQUALS
-%token TK_OP_DIFF
-%token TK_OP_MIN_EQUALS
-%token TK_OP_GRT_EQUALS
-%token TK_OP_MIN
-%token TK_OP_GRT
-%token TK_OP_ASSIGN
+%token <string> TK_ID TK_NUMBER_INT TK_NUMBER_DOUBLE TK_STRING TK_BOOLEAN
+%token <token> TK_OP_PLUS TK_OP_MINUS TK_OP_TIMES TK_OP_DIVIDED TK_OP_MOD
+%token <token> TK_OP_EXP TK_OP_HASH TK_OP_EQUALS TK_OP_DIFF TK_OP_MIN_EQUALS 
+%token <token> TK_OP_GRT_EQUALS TK_OP_MIN TK_OP_GRT TK_OP_ASSIGN TK_OP_DOTDOT
+%token <token> TK_KW_AND TK_KW_OR 
+%token <token> TK_KW_NOT 
 %token TK_OP_OPEN_PAREN
 %token TK_OP_CLOS_PAREN
 %token TK_OP_OPEN_BRACE
@@ -55,7 +46,6 @@
 %token TK_OP_COLON
 %token TK_OP_COMA
 %token TK_OP_DOT
-%token TK_OP_DOTDOT
 %token TK_OP_ELIPSIS
 %token TK_KW_BREAK
 %token TK_KW_DO
@@ -68,14 +58,21 @@
 %token TK_KW_IN
 %token TK_KW_LOCAL
 %token TK_KW_NIL
-%token TK_KW_NOT
-%token TK_KW_AND
-%token TK_KW_OR
 %token TK_KW_WHILE
 %token TK_KW_REPEAT
 %token TK_KW_RETURN
 %token TK_KW_THEN
 %token TK_KW_UNTIL
+
+%type <block> block
+%type <statvec> scope statlist
+%type <ident> identifier var /* var puede ser table pero todavia no lo consideramos */
+%type <stmt> stat repetition functioncal binding
+%type <laststat> laststat
+%type <idvec> namelist params setlist
+%type <expvec> explist1 explist23 args /* args es mas pero todavia no lo consideramos. */
+%type <expr> exp function prefixexp /* prefixexp es mas que esto pero la parte de tables todavia no lo consideramos. */
+%type <token> binaryop
 
 %left TK_KW_OR
 %left TK_KW_AND
@@ -234,11 +231,11 @@ binding     : TK_KW_LOCAL namelist
                     namelist es IdentifierList
                     explist1 es ExpressionList
                 */
-                $$ = new NMultiAssignment($1, $2, 1);
+                $$ = new NMultiAssignment($2, $4, 1);
                 /* el 1 es porque es ```local``` */
                 /* Borro las listas generadas */
-                delete $1;
                 delete $2;
+                delete $4;
             }
             ;
 
@@ -388,7 +385,7 @@ prefixexp   : var
                 /*
                     exp obviamente es de tipo NExpresion, pueden ser varios.
                 */
-                $$ = $1
+                $$ = $2
             }
             ;
 
@@ -434,7 +431,7 @@ function    : TK_KW_FUNCTION params block TK_KW_END /* funcion anonima */
 
 params      : TK_OP_OPEN_PAREN namelist TK_OP_CLOS_PAREN
             {
-                $$ = $1; /* Lo unico que cambia es la encapsulacion de '(', ')'. */
+                $$ = $2; /* Lo unico que cambia es la encapsulacion de '(', ')'. */
             }
             ;
 
