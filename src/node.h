@@ -43,19 +43,48 @@ public:
     NDouble(double value) : value(value) { }
 };
 
+class NString : public NExpression {
+public:
+    std::string value;
+    NString(std::string value) : value(value) { }
+};
+
 class NIdentifier : public NExpression {
 public:
     std::string name;
     NIdentifier(const std::string& name) : name(name) { }
 };
 
-class NMethodCall : public NExpression {
+class NVariable : public NExpression {
+
+};
+
+/*
+    Variable simple. Solo un identificador.
+*/
+class NSimpleVariable : public NVariable {
+    const NIdentifier& id;
+    NSimpleVariable(const NIdentifier& id) :
+        id(id) { }
+};
+
+/*
+    Variable de table. Un identificador.
+    TODO: 
+*/
+
+class NTableVariable : public NVariable {
+    const NIdentifier&
+};
+
+
+class NFunctionCall : public NExpression {
 public:
     const NIdentifier& id;
     ExpressionList arguments;
-    NMethodCall(const NIdentifier& id, ExpressionList& arguments) :
+    NFunctionCall(const NIdentifier& id, ExpressionList& arguments) :
         id(id), arguments(arguments) { }
-    NMethodCall(const NIdentifier& id) : id(id) { }
+    NFunctionCall(const NIdentifier& id) : id(id) { }
 };
 
 class NBinaryOperator : public NExpression {
@@ -67,22 +96,38 @@ public:
         lhs(lhs), rhs(rhs), op(op) { }
 };
 
-class NAssignment : public NExpression {
+class NUnaryOperator : public NExpression {
 public:
-    NIdentifier& lhs;
+    int op;
     NExpression& rhs;
-    NAssignment(NIdentifier& lhs, NExpression& rhs) : 
-        lhs(lhs), rhs(rhs) { }
+    NUnaryOperator(NExpression& rhs, int op) :
+        rhs(rhs), op(op) { }
+};
+
+/*
+    Multiple asignacion (y simple)
+
+    A, B, C, D = "a", "b", "oops I took both c and d"
+
+    idList = ["A", "B", "C", "D"]
+    expresionList = ["a", "b", "oops I took both C and D"]
+
+    Creo que idList.length() >= expresionList.length()
+*/
+class NMultiAssignment : public NExpression {
+public:
+    IdentifierList idList;
+    ExpressionList expresionList;
+    NMultiAssignment(IdentifierList idList, ExpressionList expresionList) :
+        idList(idList), expresionList(expresionList) { }
 };
 
 class NBlock : public NExpression {
 public:
-    StatementList localStatements;
     StatementList statements;
-    NBlock(StatementList& localStatements, StatementList& statements) {
-        localStatements(localStatements);
-        statements(statements)
-    }
+    NLastStatement& lastStatement
+    NBlock(lastStatement) :
+        lastStatement(lastStatement) { }
 };
 
 class NLastStatement : public NStatement {
@@ -123,12 +168,75 @@ public:
         id(id), assignmentExpr(assignmentExpr) { }
 };
 
-class NFunctionDeclaration : public NStatement {
+/*
+    forloop usando in
+
+    for key, value in pairs(t) do print(key, value) end
+
+    nameList = ["key", "value"]
+    expresionList = ["pairs(t)"]
+    body = '''print(key, value)'''
+*/
+class NForLoopIn : public NStatement {
 public:
-    const NIdentifier& id;
+    IdentifierList nameList;
+    ExpressionList expresionList;
+    NBlock& block;
+    NForLoop(IdentifierList nameList, ExpressionList expresionList) :
+        nameList(nameList), expresionList(expresionList) { }
+}; 
+
+/*
+    forloop con asignacion y limite e incremento definidos.
+
+    for the_number = 1, MAXIMUM, STEP do print(the_number) end
+
+    id = "the_number"
+    expresionList = ["1", "MAXIMUM", "STEP"]
+    body = ```print(the_number)```
+
+    expresionList es de largo 2 o 3.
+*/
+class NForLoopAssign : public NStatement {
+public:
+    NIdentifier& id;
+    ExpressionList expresionList;
+    NBlock& block;
+    NForLoop(NIdentifier& id, ExpressionList expresionList) :
+        id(id), expresionList(expresionList) { }
+};
+
+/*
+    * ignorando variable someFunction
+    someFunction = function(parameter, anotherParameter) print("hola") end
+    /---------/
+    arguments = ["parameter", "anotherParameter"]
+    block = ```print("hola")```
+
+*/
+class NAnonFunctionDeclaration : public NStatement {
+public:
     VariableList arguments;
     NBlock& block;
-    NFunctionDeclaration(const NIdentifier& id, const VariableList& arguments, NBlock& block) :
+    NFunctionDeclaration(VariableList& arguments, NBlock& block) :
+        arguments(arguments), block(block) { }
+};
+
+/*
+    function someFunction(parameter, anotherParameter)
+        print("hola")
+    end
+    /---------/
+    id = 'someFunction'
+    arguments = ["parameter", "anotherParameter"]
+    block = ```print("hola")```
+*/
+class NFunctionDeclaration : public NStatement {
+public:
+    NIdentifier& id;
+    VariableList arguments;
+    NBlock& block;
+    NFunctionDeclaration(NIdentifier& id, VariableList& arguments, NBlock& block) :
         id(id), arguments(arguments), block(block) { }
 };
 

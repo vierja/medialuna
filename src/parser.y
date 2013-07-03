@@ -1,10 +1,32 @@
 %{
-#include <string>
-#include "scanner.h"
-#define YYSTYPE Token // tipo de yylval
+    #include <string>
+    #include "scanner.h"
+    #include "node.h"
+
+    NBlock *programBlock;
+
+    /*#define YYSTYPE Token // tipo de yylval*/
+    extern int yylex();
+    void yyerror(const char *);
+    #define YYDEBUG 1 /* For Debugging */
+    int errors;
 %}
 
-%start chunk
+%option debug
+%option c++
+
+%union {
+    Node *node;
+    NBlock *block;
+    NExpression *expr;
+    NStatement *stmt;
+    NIdentifier *ident;
+    NVariableDeclaration *var_decl;
+    std::vector<NVariableDeclaration*> *varvec;
+    std::vector<NExpression*> *exprvec;
+    std::string *string;
+    int token;
+}
 
 %token TK_ID
 %token TK_NUMBER_INT
@@ -66,42 +88,101 @@
 %right TK_KW_NOT TK_OP_HASH
 %right TK_OP_EXP
 
+%start chunk
+
 %%
 
 /* Creado a partir de http://lua-users.org/wiki/LuaGrammar */
 
-chunk       : block ;
+chunk       : block { programBlock = $1; }
+            ;
 
-semi        :
+semi        : /* vacio */
             | TK_OP_SEMICOLON
             ;
 
 block       : scope statlist
+            {
+                /*
+                Creo un nuevo bloque y agrego los statements a partir
+                de las listas scope y statlist (en el orden)
+                */
+                $$ = new NBlock();
+                $$->statements_add_list($<scope>1);
+                $$->statements_add_list($<statlist>2); 
+            }
             | scope statlist laststat semi
+            {
+                /* 
+                Creo un nuevo bloque y agrego los statements a partir
+                de las listas scope y statlist (en el orden)
+                Tambien tengo un statement final (UNICO, no como otros lenguajes)
+                */
+                $$ = new NBlock($<laststat>3);
+                $$->statements_add_list($<scope>1);
+                $$->statements_add_list($<statlist>2); 
+                /* Borro scope y statlist para no dejar memoria colgada. */
+                delete $1;
+                delete $2;
+            }
             ;
 
-ublock      : block TK_KW_UNTIL exp ;
-
-scope       :
+scope       : { $$ = new StatementList();}
             | scope statlist binding semi
+            {
+                /* itero sobre statlist para agregar a scope. */
+                for(std::vector<T>::iterator it = $<statlist>2.begin(); it != $<statlist>2.end(); ++it) {
+                    $1->push_back(it);
+                }
+                /* finalmente agregando binding (definiciones local) */
+                $1->push_back($<binding>3);
+                /* Borro statlist para no dejar memoria colgada. */
+                delete $2;
+            }
             ;
 
-statlist    :
-            | statlist stat semi
+statlist    : { $$ = new StatementList(); /* Creo una lista vacia */ } 
+            | statlist stat semi { $1->push_back($<stat>2); /* La populo poniendo siempre al final. */}
             ;
 
-stat        : TK_KW_DO block TK_KW_END
-            | TK_KW_WHILE exp TK_KW_UNTIL block TK_KW_END
-            | repetition TK_KW_DO block TK_KW_END
-            | TK_KW_REPEAT ublock
+identifier  : TK_ID
+            {
+                $$ = new NIdentifier(*$1); delete $1; 
+            }
+
+stat        : repetition TK_KW_DO block TK_KW_END
+            {
+                $1->block = $<block>3; /* Luego de crear repetition agrego block.*/
+            }
             | TK_KW_IF conds TK_KW_END
-            | TK_KW_FUNCTION funcname funcbody
+            {
+                /* TODO: Complicado */
+            }
+            | TK_KW_FUNCTION identifier params block TK_KW_END
+            {
+                $$ = new NFunctionDeclaration(*$2, *$3, *$4);
+            }
             | setlist TK_OP_ASSIGN explist1
+            {
+                $$ = new NMultiAssignment($1, $2);
+                /* Borro las listas generadas */
+                delete $1;
+                delete $2;
+            }
             | functioncal
+            {
+
+            }
             ;
 
-repetition  : TK_KW_FOR TK_ID TK_OP_ASSIGN explist23
+repetition  : TK_KW_FOR identifier TK_OP_ASSIGN explist23
+            {
+                $$ = new NForLoopAssign(*$2, *$<explist23>4);
+            }
             | TK_KW_FOR namelist TK_KW_IN explist1
+            {
+                $$ = new NForLoopIn(*$<namelist>2, *<explist1>4);
+            }
             ;
 
 conds       : condlist
@@ -114,26 +195,23 @@ condlist    : cond
 
 cond        : exp TK_KW_THEN block ;
 
-laststat    : TK_KW_BREAK
-            | TK_KW_RETURN
-            | TK_KW_RETURN explist1
+laststat    : TK_KW_BREAK { $$ = new NLastStatement(1); }
+            | TK_KW_RETURN { $$ = new NLastStatement(0); }
+            | TK_KW_RETURN explist1 { $$ = new NLastStatement($<explist1>1); }
             ;
 
-binding     : TK_KW_LOCAL namelist
+binding     : TK_KW_LOCAL namelist {$$ = }
             | TK_KW_LOCAL namelist TK_OP_ASSIGN explist1
-            | TK_KW_LOCAL TK_KW_FUNCTION TK_ID funcbody
             ;
 
-funcname    : dottedname
-            | dottedname TK_OP_COLON TK_ID
-            ;
-
-dottedname  : TK_ID
-            | dottedname TK_OP_DOT TK_ID
-            ;
-
-namelist    : TK_ID
-            | namelist TK_OP_COMA TK_ID
+namelist    : identifier
+            {
+                $$ = new IdentifierList(); $$->push_back($1);
+            }
+            | namelist TK_OP_COMA identifier
+            {
+                $1->push_back(*3); /* armo la lista*/
+            }
             ;
 
 explist1    : exp
@@ -176,9 +254,9 @@ setlist     : var
             | setlist TK_OP_COMA var
             ;
 
-var         : TK_ID
+var         : identifier
             | prefixexp TK_OP_OPEN_BRACK exp TK_OP_CLOS_BRACK
-            | prefixexp TK_OP_DOT TK_ID
+            | prefixexp TK_OP_DOT identifier
             ;
 
 prefixexp   : var
@@ -187,25 +265,46 @@ prefixexp   : var
             ;
 
 functioncal : prefixexp args
-            | prefixexp TK_OP_COLON TK_ID args
+            {
+                $$ = new NFunctionCall($1, $2);
+                /* Borro la lista de argumentos. */
+                delete $2;
+            }
+            | prefixexp TK_OP_COLON identifier args
             ;
 
 args        : TK_OP_OPEN_PAREN TK_OP_CLOS_PAREN
+            {
+                $$ = new ExpressionList();
+                /* lista vacia de argumentos */
+            }
             | TK_OP_OPEN_PAREN explist1 TK_OP_CLOS_PAREN
+            {
+                /* los parentesis solo encapsulan. */
+                $$ = $2
+            }
             | tableconstr
+            {
+                /* Dificil TODO: */
+            }
             | TK_STRING
+            {
+                $$ = new ExpressionList();
+                NString value = new NString($1);
+                $$->push_back(value);
+            }
             ;
 
-function    : TK_KW_FUNCTION funcbody ;
+function    : TK_KW_FUNCTION params block TK_KW_END /* funcion anonima */
+            {
+                $$ = new NAnonFunctionDeclaration(*$2, *$3);
+            }
+            ; 
 
-funcbody    : params block TK_KW_END ;
-
-params      : TK_OP_OPEN_PAREN parlist TK_OP_CLOS_PAREN ;
-
-parlist     :
-            | namelist
-            | TK_OP_ELIPSIS
-            | namelist TK_OP_COMA TK_OP_ELIPSIS
+params      : TK_OP_OPEN_PAREN namelist TK_OP_CLOS_PAREN
+            {
+                $$ = $1; /* Lo unico que cambia es la encapsulacion de '(', ')'. */
+            }
             ;
 
 tableconstr : TK_OP_OPEN_BRACE TK_OP_CLOS_BRACE
@@ -217,7 +316,7 @@ fieldlist   : field
             ; /* TODO: Falta una que no entendi. */
 
 field       : exp
-            | TK_ID TK_OP_ASSIGN exp
+            | identifier TK_OP_ASSIGN exp
             | TK_OP_OPEN_BRACK exp TK_OP_CLOS_BRACK TK_OP_ASSIGN exp
             ;
 
@@ -232,7 +331,7 @@ main(int argc, char* argv[]){
     errors = 0;
     yyparse();
 }
-yyerror(char *s){
+void yyerror(const char *s){
     printf("%s\n", s);
 }
 
