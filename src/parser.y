@@ -72,7 +72,6 @@
 %type <idvec> namelist params setlist
 %type <expvec> explist1 explist23 args /* args es mas pero todavia no lo consideramos. */
 %type <expr> exp function prefixexp /* prefixexp es mas que esto pero la parte de tables todavia no lo consideramos. */
-%type <token> binaryop
 
 %left TK_KW_OR
 %left TK_KW_AND
@@ -328,16 +327,66 @@ exp         : TK_KW_NIL
             {
                 $$ = new NUnaryOperator($2, $1);
             }
-            | exp binaryop exp
+            | exp TK_KW_OR exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_KW_AND exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_OP_MIN exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_OP_MIN_EQUALS exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_OP_GRT exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_OP_GRT_EQUALS exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_OP_EQUALS exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_OP_DIFF exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_OP_DOTDOT exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_OP_PLUS exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_OP_MINUS exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_OP_TIMES exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_OP_DIVIDED exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_OP_MOD exp
+            {
+                $$ = NBinaryOperator($2, $1, $3);
+            }
+            | exp TK_OP_EXP exp
             {
                 $$ = NBinaryOperator($2, $1, $3)
             }
-            ;
-
-binaryop    : TK_KW_AND | TK_KW_OR | TK_OP_MIN | TK_OP_MIN_EQUALS | TK_OP_GRT
-            | TK_OP_GRT_EQUALS | TK_OP_EQUALS | TK_OP_DIFF | TK_OP_DOTDOT
-            | TK_OP_PLUS | TK_OP_MINUS | TK_OP_TIMES | TK_OP_DIVIDED
-            | TK_OP_MOD | TK_OP_EXP
             ;
 
 setlist     : var
