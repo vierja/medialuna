@@ -1,15 +1,12 @@
-%{
-    #include <string>
-    #include "scanner.h"
-    #include "node.h"
+%error-verbose
 
+%{
+    #include "node.h"
     NBlock *programBlock;
 
-    /*#define YYSTYPE Token // tipo de yylval*/
     extern int yylex();
-    void yyerror(const char *);
+    void yyerror(const char *s) { printf("ERROR: %s\n", s); };
     #define YYDEBUG 1 /* For Debugging */
-    int errors;
 %}
 
 
@@ -19,6 +16,7 @@
     NExpression *expr;
     NStatement *stmt;
     NIdentifier *ident;
+    NString *nstring;
     NLastStatement *laststat;
     NVariableDeclaration *var_decl;
     std::vector<NVariableDeclaration*> *varvec;
@@ -30,7 +28,7 @@
     int token;
 }
 
-%token <string> TK_ID TK_NUMBER_INT TK_NUMBER_DOUBLE TK_STRING TK_BOOLEAN
+%token <string> TK_ID TK_NUMBER_INT TK_NUMBER_DOUBLE TK_BOOLEAN TK_STRING
 %token <token> TK_OP_PLUS TK_OP_MINUS TK_OP_TIMES TK_OP_DIVIDED TK_OP_MOD
 %token <token> TK_OP_EXP TK_OP_HASH TK_OP_EQUALS TK_OP_DIFF TK_OP_MIN_EQUALS 
 %token <token> TK_OP_GRT_EQUALS TK_OP_MIN TK_OP_GRT TK_OP_ASSIGN TK_OP_DOTDOT
@@ -67,11 +65,11 @@
 %type <block> block
 %type <statvec> scope statlist
 %type <ident> identifier var /* var puede ser table pero todavia no lo consideramos */
-%type <stmt> stat repetition functioncal binding
+%type <stmt> stat /*repetition*/ binding
 %type <laststat> laststat
-%type <idvec> namelist params setlist
+%type <idvec> namelist params setlist parlist
 %type <expvec> explist1 explist23 args /* args es mas pero todavia no lo consideramos. */
-%type <expr> exp function prefixexp /* prefixexp es mas que esto pero la parte de tables todavia no lo consideramos. */
+%type <expr> exp function functioncal prefixexp /* prefixexp es mas que esto pero la parte de tables todavia no lo consideramos. */
 
 %left TK_KW_OR
 %left TK_KW_AND
@@ -88,7 +86,10 @@
 
 /* Creado a partir de http://lua-users.org/wiki/LuaGrammar */
 
-chunk       : block { programBlock = $1; }
+chunk       : block
+            {
+                programBlock = $1;
+            }
             ;
 
 semi        : /* vacio */
@@ -101,9 +102,12 @@ block       : scope statlist
                 Creo un nuevo bloque y agrego los statements a partir
                 de las listas scope y statlist (en el orden)
                 */
-                $$ = new NBlock();
-                $$->statements_add_list($<scope>1);
-                $$->statements_add_list($<statlist>2); 
+                /* Creo un LastStatment trucho (return sin valores) */
+                ExpressionList* emptyExprList = new ExpressionList();
+                NLastStatement* last = new NLastStatement(0, *emptyExprList);
+                $$ = new NBlock(*last);
+                $$->statements_add_list(*$1);
+                $$->statements_add_list(*$2); 
             }
             | scope statlist laststat semi
             {
@@ -112,9 +116,9 @@ block       : scope statlist
                 de las listas scope y statlist (en el orden)
                 Tambien tengo un statement final (UNICO, no como otros lenguajes)
                 */
-                $$ = new NBlock($<laststat>3);
-                $$->statements_add_list($<scope>1);
-                $$->statements_add_list($<statlist>2); 
+                $$ = new NBlock(*$3);
+                $$->statements_add_list(*$1);
+                $$->statements_add_list(*$2); 
                 /* Borro scope y statlist para no dejar memoria colgada. */
                 delete $1;
                 delete $2;
@@ -126,13 +130,14 @@ scope       : { $$ = new StatementList();}
             {
                 /* cualquiera de las dos listas pueden ser vacias. */
                 /* itero sobre statlist para agregar a scope. */
-                for(std::vector<T>::iterator it = $<statlist>2.begin(); it != $<statlist>2.end(); ++it) {
-                    $1->push_back(it);
-                }
+                
+                //for(std::vector<stmt>::iterator it = $2->begin(); it != $2->end(); ++it) {
+                //    $1->push_back(it);
+                //}
                 /* finalmente agregando binding (definiciones local) */
-                for(std::vector<T>::iterator it = $<binding>3.begin(); it != $<binding>3.end(); ++it) {
-                    $1->push_back(it);
-                }
+                //for(std::vector<stmt>::iterator it = $3->begin(); it != $3->end(); ++it) {
+                //    $1->push_back(it);
+                //}
                 /* Borro statlist y binding para no dejar memoria colgada. */
                 delete $2;
                 delete $3;
@@ -142,7 +147,7 @@ scope       : { $$ = new StatementList();}
 statlist    : { $$ = new StatementList(); /* Creo una lista vacia */ } 
             | statlist stat semi
             {
-                $1->push_back($<stat>2);
+                $1->push_back($2);
                 /* La populo poniendo siempre al final. */
             }
             ;
@@ -153,10 +158,13 @@ identifier  : TK_ID
                 delete $1; /* TODO : Porque delete? */
             }
 
-stat        : repetition TK_KW_DO block TK_KW_END
+stat        : TK_KW_FOR identifier TK_OP_ASSIGN explist23 TK_KW_DO block TK_KW_END
             {
-                $1->block = $<block>3;
-                /* Luego de crear repetition agrego block. */
+                $$ = new NForLoopAssign(*$2, *$4, *$6);
+            }
+            | TK_KW_FOR namelist TK_KW_IN explist1 TK_KW_DO block TK_KW_END
+            {
+                $$ = new NForLoopIn(*$2, *$4, *$6);
             }
             | TK_KW_IF conds TK_KW_END
             {
@@ -168,28 +176,29 @@ stat        : repetition TK_KW_DO block TK_KW_END
             }
             | setlist TK_OP_ASSIGN explist1
             {
-                $$ = new NMultiAssignment($1, $2, 0);
+                $$ = new NMultiAssignment(*$1, *$3, 0);
                 /* El 0 es porque NO es ```local```. */
                 /* Borro las listas generadas */
                 delete $1;
-                delete $2;
+                delete $3;
             }
             | functioncal
             {
-                /* Se crea en su regla */
-                $$ = $1;
+                /* Es un functioncall (expresion) como statement. Se usa NExpressionStatement */
+                $$ = new NExpressionStatement(*$1);
             }
             ;
-
+/*
 repetition  : TK_KW_FOR identifier TK_OP_ASSIGN explist23
             {
-                $$ = new NForLoopAssign(*$2, *$<explist23>4);
+                $$ = new NForLoopAssignNoBlock(*$2, *$<explist23>4);
             }
             | TK_KW_FOR namelist TK_KW_IN explist1
             {
-                $$ = new NForLoopIn(*$<namelist>2, *<explist1>4);
+                $$ = new NForLoopInNoBlock(*$<namelist>2, *<explist1>4);
             }
             ;
+*/
 
 conds       : condlist
             | condlist TK_KW_ELSE block
@@ -203,26 +212,26 @@ cond        : exp TK_KW_THEN block ;
 
 laststat    : TK_KW_BREAK
             {
-                $$ = new NLastStatement(1);
+                ExpressionList* emptyExprList = new ExpressionList();
+                $$ = new NLastStatement(1, *emptyExprList);
                 /* se pasa por parametro si es BREAK */
             }
             | TK_KW_RETURN
             {
-                $$ = new NLastStatement(0);
+                ExpressionList* emptyExprList = new ExpressionList();
+                $$ = new NLastStatement(0, *emptyExprList);
                 /* o si no lo es. */
             }
             | TK_KW_RETURN explist1
             {
                 /* Si devuelve algo entonces es impliciamente return. */ 
-                $$ = new NLastStatement($<explist1>1);
+                $$ = new NLastStatement(0, *$2);
             }
             ;
 
 binding     : TK_KW_LOCAL namelist
             {
-                $$ = new NMultiVariableDeclaration(1);
-                $$->isList = $2;
-                delete $2;
+                $$ = new NMultiVariableDeclaration(1, *$2);
             }
             | TK_KW_LOCAL namelist TK_OP_ASSIGN explist1
             {
@@ -230,7 +239,7 @@ binding     : TK_KW_LOCAL namelist
                     namelist es IdentifierList
                     explist1 es ExpressionList
                 */
-                $$ = new NMultiAssignment($2, $4, 1);
+                $$ = new NMultiAssignment(*$2, *$4, 1);
                 /* el 1 es porque es ```local``` */
                 /* Borro las listas generadas */
                 delete $2;
@@ -286,10 +295,15 @@ exp         : TK_KW_NIL
             {
                 $$ = new NNil();
             }
+            | TK_STRING
+            {
+                $$ = new NString(*$1);
+            }
             | TK_BOOLEAN
             {
                 /* chanchada */
-                $$ = new NBoolean($1 == "true");
+                std::string trueStr ("true");
+                $$ = new NBoolean($1->compare(trueStr));
             }
             | TK_NUMBER_INT
             {
@@ -310,6 +324,7 @@ exp         : TK_KW_NIL
             | prefixexp
             {
                 /* TODO : Complicado */
+                $$ = $1;
             }
             | tableconstr
             {
@@ -317,7 +332,7 @@ exp         : TK_KW_NIL
             }
             | TK_KW_NOT exp
             {
-                $$ = new NUnaryOperator($2, $1);
+                $$ = new NUnaryOperator(*$2, $1);
             }
             | TK_OP_HASH exp
             {
@@ -325,67 +340,67 @@ exp         : TK_KW_NIL
             }
             | TK_OP_MINUS exp
             {
-                $$ = new NUnaryOperator($2, $1);
+                $$ = new NUnaryOperator(*$2, $1);
             }
             | exp TK_KW_OR exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_KW_AND exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_OP_MIN exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_OP_MIN_EQUALS exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_OP_GRT exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_OP_GRT_EQUALS exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_OP_EQUALS exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_OP_DIFF exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_OP_DOTDOT exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_OP_PLUS exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_OP_MINUS exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_OP_TIMES exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_OP_DIVIDED exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_OP_MOD exp
             {
-                $$ = NBinaryOperator($2, $1, $3);
+                $$ = new NBinaryOperator($2, *$1, *$3);
             }
             | exp TK_OP_EXP exp
             {
-                $$ = NBinaryOperator($2, $1, $3)
+                $$ = new NBinaryOperator($2, *$1, *$3)
             }
             ;
 
@@ -408,17 +423,20 @@ var         : identifier
             {
                 /* Falta manejo de tablas. */
             }
-            | prefixexp TK_OP_DOT identifier
+            | identifier TK_OP_DOT identifier
             {
-                /* Creo que no se debe implementar */
-                /* TODO: CHEQUEAR */
+                std::string first = $1->name;
+                std::string secon = $3->name;
+                first.append(".");
+                first.append(secon);
+                $$ = new NIdentifier(first);
             }
             ;
 
 prefixexp   : var
             {
                 /*
-                    var es de tipo NIdentifier : NExpression (sin soporte a tablas)
+                    var es de tipo NIdentifier : NExpression (sin soporte a tablas por ahora)
                 */
                 $$ = $1
             }
@@ -429,21 +447,60 @@ prefixexp   : var
                 */
                 $$ = $1
             }
+            /* Lo ignoro porque no entiendo de donde sale y puede ser el que esta dando error.
+            Edit1: Probando fue el que saco el conflicto.
+
             | TK_OP_OPEN_PAREN exp TK_OP_CLOS_PAREN
             {
                 /*
                     exp obviamente es de tipo NExpresion, pueden ser varios.
-                */
+                
                 $$ = $2
-            }
+            }*/
             ;
 
-functioncal : prefixexp args
+functioncal :
+            /* ORIGINAL TODO:
+            prefixexp args 
             {
                 $$ = new NFunctionCall($1, $2);
-                /* Borro la lista de argumentos. */
+                Borro la lista de argumentos. 
                 delete $2;
             }
+            */
+            /* FIN DE ORIGINAL: TODO */
+            /* SIMPLIFICACION */
+            identifier TK_OP_OPEN_PAREN TK_OP_CLOS_PAREN
+            {
+                ExpressionList* arguments = new ExpressionList();
+                $$ = new NFunctionCall(*$1, *arguments);
+            }
+            | identifier TK_OP_OPEN_PAREN explist1 TK_OP_CLOS_PAREN
+            {
+                $$ = new NFunctionCall(*$1, *$3);
+            }
+            | identifier TK_OP_DOT identifier TK_OP_OPEN_PAREN TK_OP_CLOS_PAREN
+            {
+                std::string first = $1->name;
+                std::string secon = $3->name;
+                first.append(".");
+                first.append(secon);
+                NIdentifier* realid = new NIdentifier(first);
+                ExpressionList* arguments = new ExpressionList();
+                $$ = new NFunctionCall(*realid, *arguments);
+                /* TODO: Falta deletes */
+            }
+            | identifier TK_OP_DOT identifier TK_OP_OPEN_PAREN explist1 TK_OP_CLOS_PAREN
+            {
+                std::string first = $1->name;
+                std::string secon = $3->name;
+                first.append(".");
+                first.append(secon);
+                NIdentifier* realid = new NIdentifier(first);
+                $$ = new NFunctionCall(*realid, *$5);
+                /* TODO: Falta deletes */
+            }
+            /* FIN SIMPLIFICACION */
             | prefixexp TK_OP_COLON identifier args
             {
                 /* No es obligatoria. */
@@ -467,8 +524,9 @@ args        : TK_OP_OPEN_PAREN TK_OP_CLOS_PAREN
             | TK_STRING
             {
                 $$ = new ExpressionList();
-                NString value = new NString($1);
+                NString* value = new NString(*$1);
                 $$->push_back(value);
+                delete $1;
             }
             ;
 
@@ -478,11 +536,21 @@ function    : TK_KW_FUNCTION params block TK_KW_END /* funcion anonima */
             }
             ; 
 
-params      : TK_OP_OPEN_PAREN namelist TK_OP_CLOS_PAREN
+params      : TK_OP_OPEN_PAREN parlist TK_OP_CLOS_PAREN
             {
                 $$ = $2; /* Lo unico que cambia es la encapsulacion de '(', ')'. */
             }
             ;
+
+parlist     : /* vacio */
+            {
+                $$ = new IdentifierList(); /* lista vacia */
+            }
+            | namelist
+            {
+                $$ = $1; /* Lista con identifiers no vacia */
+            }
+            ; /* TODO: FALTAN 2 mas: "..." y "namelist ...". Ver que hacer con ... */
 
 /* Ignoramos las tables hasta tener una version funcionando */
 tableconstr : TK_OP_OPEN_BRACE TK_OP_CLOS_BRACE
@@ -499,17 +567,4 @@ field       : exp
             ;
 
 %%
-
-/* para probar */
-main(int argc, char* argv[]){
-    extern FILE *yyin;
-    ++argv, --argc;
-    yyin = fopen(argv[0], "r");
-    yydebug = 1;
-    errors = 0;
-    yyparse();
-}
-void yyerror(const char *s){
-    printf("%s\n", s);
-}
 

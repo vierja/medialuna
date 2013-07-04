@@ -10,6 +10,7 @@ class CodeGenContext;
 class NStatement;
 class NExpression;
 class NVariableDeclaration;
+class NIdentifier;
 
 typedef std::vector<NStatement*> StatementList;
 typedef std::vector<NExpression*> ExpressionList;
@@ -35,9 +36,14 @@ class NStatement : public Node {
 */
 class NNil : public NExpression {
 public:
-    NInteger() : { }
+    NNil() { }
 };
 
+/*
+    Valor Booleano
+    trueVal = 1 si es True
+              0 si es False
+*/
 class NBoolean : public NExpression {
 public:
     int trueVal;
@@ -59,7 +65,7 @@ public:
 class NString : public NExpression {
 public:
     std::string value;
-    NString(std::string value) : value(value) { }
+    NString(const std::string& value) : value(value) { }
 };
 
 class NIdentifier : public NExpression {
@@ -68,28 +74,24 @@ public:
     NIdentifier(const std::string& name) : name(name) { }
 };
 
-class NVariable : public NExpression {
-
-};
-
 /*
-    Variable simple. Solo un identificador.
-*/
-class NSimpleVariable : public NVariable {
+    TODO:
+    Esto en verdad teoricamente puede recibir una lista
+    de identificadores secuenciales separados por un .
+    Para simplificar solo permitimos un nivel.
+    Es para hacer:
+        table.add()
+    Donde id    = 'add'
+          library = 'table'
+
+
+class NIdentifierMethod : public NIdentifier {
+public:
     const NIdentifier& id;
-    NSimpleVariable(const NIdentifier& id) :
-        id(id) { }
-};
-
-/*
-    Variable de table. Un identificador.
-    TODO: 
-*/
-
-class NTableVariable : public NVariable {
-    const NIdentifier&
-};
-
+    const NIdentifier& library;
+    NIdentifierMethod(const NIdentifier& id, const NIdentifier& library) :
+        id(id), library(library) { }
+};*/
 
 class NFunctionCall : public NExpression {
 public:
@@ -105,8 +107,8 @@ public:
     int op;
     NExpression& lhs;
     NExpression& rhs;
-    NBinaryOperator(NExpression& lhs, int op, NExpression& rhs) :
-        lhs(lhs), rhs(rhs), op(op) { }
+    NBinaryOperator(int op, NExpression& lhs, NExpression& rhs) :
+        op(op), lhs(lhs), rhs(rhs) { }
 };
 
 class NUnaryOperator : public NExpression {
@@ -133,7 +135,16 @@ public:
     ExpressionList expresionList;
     int isLocal;
     NMultiAssignment(IdentifierList idList, ExpressionList expresionList, int isLocal) :
-        idList(idList), expresionList(expresionList) isLocal(isLocal) { }
+        idList(idList), expresionList(expresionList), isLocal(isLocal) { }
+};
+
+class NLastStatement : public NStatement {
+public:
+    ExpressionList returnList;
+    int isBreak;
+
+    NLastStatement(int isBreak, ExpressionList& returnList):
+        isBreak(isBreak), returnList(returnList) { }
 };
 
 /*
@@ -145,21 +156,12 @@ class NBlock : public NExpression {
 public:
     StatementList statements;
     NLastStatement& lastStatement;
-    NBlock(): {} /* constructor sin lastStatment */
-    NBlock(lastStatement) : /* constructor con lastStatment */
+    NBlock(NLastStatement& lastStatement) : /* constructor con lastStatment */
         lastStatement(lastStatement) { }
-};
 
-class NLastStatement : public NStatement {
-public:
-    ExpressionList returnList;
-    int isBreak;
-
-    NLastStatement(isBreak):
-        isBreak(isBreak) { }
-
-    NLastStatement(ExpressionList& returnList):
-        isBreak(false), returnList(returnList) { }
+    void statements_add_list(StatementList& statements){
+        //TODO!!!!!
+    };
 };
 
 class NExpressionStatement : public NStatement {
@@ -173,10 +175,8 @@ class NMultiVariableDeclaration : public NStatement {
 public:
     IdentifierList idList;
     int isLocal;
-    NMultiVariableDeclaration(int isLocal):
-        isLocal(isLocal) { }
-    NMultiVariableDeclaration(IdentifierList idList):
-        idList(idList) { }
+    NMultiVariableDeclaration(int isLocal, IdentifierList& idList):
+        isLocal(isLocal), idList(idList) { }
 
 };
 
@@ -204,8 +204,8 @@ public:
     IdentifierList nameList;
     ExpressionList expresionList;
     NBlock& block;
-    NForLoop(IdentifierList nameList, ExpressionList expresionList) :
-        nameList(nameList), expresionList(expresionList) { }
+    NForLoopIn(IdentifierList nameList, ExpressionList expresionList, NBlock& block) :
+        nameList(nameList), expresionList(expresionList), block(block) { }
 }; 
 
 /*
@@ -224,9 +224,10 @@ public:
     NIdentifier& id;
     ExpressionList expresionList;
     NBlock& block;
-    NForLoop(NIdentifier& id, ExpressionList expresionList) :
-        id(id), expresionList(expresionList) { }
+    NForLoopAssign(NIdentifier& id, ExpressionList expresionList, NBlock& block) :
+        id(id), expresionList(expresionList), block(block) { }
 };
+
 
 /*
     * ignorando variable someFunction
@@ -236,11 +237,11 @@ public:
     block = ```print("hola")```
 
 */
-class NAnonFunctionDeclaration : public NStatement {
+class NAnonFunctionDeclaration : public NExpression {
 public:
-    VariableList arguments;
+    IdentifierList arguments;
     NBlock& block;
-    NFunctionDeclaration(VariableList& arguments, NBlock& block) :
+    NAnonFunctionDeclaration(IdentifierList& arguments, NBlock& block) :
         arguments(arguments), block(block) { }
 };
 
@@ -256,9 +257,9 @@ public:
 class NFunctionDeclaration : public NStatement {
 public:
     NIdentifier& id;
-    VariableList arguments;
+    IdentifierList arguments;
     NBlock& block;
-    NFunctionDeclaration(NIdentifier& id, VariableList& arguments, NBlock& block) :
+    NFunctionDeclaration(NIdentifier& id, IdentifierList& arguments, NBlock& block) :
         id(id), arguments(arguments), block(block) { }
 };
 
