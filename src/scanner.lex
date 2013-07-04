@@ -1,8 +1,10 @@
-%option c++
-%option yylineno
-
 %{
-#include "scanner.h"
+#include <string>
+#include "node.h"
+#include "parser.hpp"
+#define SAVE_TOKEN yylval.string = new std::string(yytext, yyleng)
+#define TOKEN(t) (yylval.token = t)
+extern "C" int yywrap(){}
 %}
 
 SPACES              [ \t\n\v\f\r]+
@@ -20,69 +22,69 @@ SCIENTIFIC          {DIGIT}+"."?{DIGIT}*("e"|"E")("+"|"-")?{DIGIT}+
 
 %%
 
-{SPACES}            // ignoro espacios,tabs, etc.
+{SPACES}            ;// ignoro espacios,tabs, etc.
 
-{DIGIT}+            return TK_NUMBER_INT; 
-{DIGIT}+"."{DIGIT}* return TK_NUMBER_DOUBLE; 
-{SCIENTIFIC}        return TK_NUMBER_DOUBLE;  // notacion cientifica
-0[x|X]{HEX}         return TK_NUMBER_INT;  // notacion HEX
-{BOOL}              return TK_BOOLEAN; 
+{DIGIT}+            SAVE_TOKEN; return TK_NUMBER_INT; 
+{DIGIT}+"."{DIGIT}* SAVE_TOKEN; return TK_NUMBER_DOUBLE; 
+{SCIENTIFIC}        SAVE_TOKEN; return TK_NUMBER_DOUBLE;  // notacion cientifica
+0[x|X]{HEX}         SAVE_TOKEN; return TK_NUMBER_INT;  // notacion HEX
+{BOOL}              SAVE_TOKEN; return TK_BOOLEAN; 
 
-{STRING}            return TK_STRING; 
-{MULTI_LINE_STR_1}  return TK_STRING; 
-{MULTI_LINE_STR_2}  return TK_STRING; 
-{MULTI_LINE_STR_3}  return TK_STRING; 
-{MULTI_LINE_STR_4}  return TK_STRING; 
+{STRING}            SAVE_TOKEN; return TK_STRING; 
+{MULTI_LINE_STR_1}  SAVE_TOKEN; return TK_STRING; 
+{MULTI_LINE_STR_2}  SAVE_TOKEN; return TK_STRING; 
+{MULTI_LINE_STR_3}  SAVE_TOKEN; return TK_STRING; 
+{MULTI_LINE_STR_4}  SAVE_TOKEN; return TK_STRING; 
 
-"+"                 return TK_OP_PLUS; 
-"-"                 return TK_OP_MINUS; 
-"*"                 return TK_OP_TIMES; 
-"/"                 return TK_OP_DIVIDED; 
-"%"                 return TK_OP_MOD; 
-"^"                 return TK_OP_EXP; 
-"#"                 return TK_OP_HASH; 
-"=="                return TK_OP_EQUALS; 
-"~="                return TK_OP_DIFF; 
-"<="                return TK_OP_MIN_EQUALS; 
-">="                return TK_OP_GRT_EQUALS; 
-"<"                 return TK_OP_MIN; 
-">"                 return TK_OP_GRT; 
-"="                 return TK_OP_ASSIGN; 
-"("                 return TK_OP_OPEN_PAREN; 
-")"                 return TK_OP_CLOS_PAREN; 
-"{"                 return TK_OP_OPEN_BRACE; 
-"}"                 return TK_OP_CLOS_BRACE; 
-"["                 return TK_OP_OPEN_BRACK; 
-"]"                 return TK_OP_CLOS_BRACK; 
-";"                 return TK_OP_SEMICOLON; 
-":"                 return TK_OP_COLON; 
-","                 return TK_OP_COMA; 
-"."                 return TK_OP_DOT; 
-".."                return TK_OP_DOTDOT; 
-"..."               return TK_OP_ELIPSIS; 
+"+"                 return TOKEN(TK_OP_PLUS); 
+"-"                 return TOKEN(TK_OP_MINUS); 
+"*"                 return TOKEN(TK_OP_TIMES); 
+"/"                 return TOKEN(TK_OP_DIVIDED); 
+"%"                 return TOKEN(TK_OP_MOD); 
+"^"                 return TOKEN(TK_OP_EXP); 
+"#"                 return TOKEN(TK_OP_HASH); 
+"=="                return TOKEN(TK_OP_EQUALS); 
+"~="                return TOKEN(TK_OP_DIFF); 
+"<="                return TOKEN(TK_OP_MIN_EQUALS); 
+">="                return TOKEN(TK_OP_GRT_EQUALS); 
+"<"                 return TOKEN(TK_OP_MIN); 
+">"                 return TOKEN(TK_OP_GRT); 
+"="                 return TOKEN(TK_OP_ASSIGN); 
+"("                 return TOKEN(TK_OP_OPEN_PAREN); 
+")"                 return TOKEN(TK_OP_CLOS_PAREN); 
+"{"                 return TOKEN(TK_OP_OPEN_BRACE); 
+"}"                 return TOKEN(TK_OP_CLOS_BRACE); 
+"["                 return TOKEN(TK_OP_OPEN_BRACK); 
+"]"                 return TOKEN(TK_OP_CLOS_BRACK); 
+";"                 return TOKEN(TK_OP_SEMICOLON); 
+":"                 return TOKEN(TK_OP_COLON); 
+","                 return TOKEN(TK_OP_COMA); 
+"."                 return TOKEN(TK_OP_DOT); 
+".."                return TOKEN(TK_OP_DOTDOT); 
+"..."               return TOKEN(TK_OP_ELIPSIS); 
 
-and                 return TK_KW_AND; 
-break               return TK_KW_BREAK; 
-do                  return TK_KW_DO; 
-else                return TK_KW_ELSE; 
-elseif              return TK_KW_ELSEIF; 
-end                 return TK_KW_END; 
-for                 return TK_KW_FOR; 
-function            return TK_KW_FUNCTION; 
-if                  return TK_KW_IF; 
-in                  return TK_KW_IN; 
-local               return TK_KW_LOCAL; 
-nil                 return TK_KW_NIL; 
-not                 return TK_KW_NOT; 
-or                  return TK_KW_OR; 
-while               return TK_KW_WHILE; 
-repeat              return TK_KW_REPEAT; 
-return              return TK_KW_RETURN; 
-then                return TK_KW_THEN; 
-until               return TK_KW_UNTIL; 
+and                 return TOKEN(TK_KW_AND); 
+break               return TOKEN(TK_KW_BREAK); 
+do                  return TOKEN(TK_KW_DO); 
+else                return TOKEN(TK_KW_ELSE); 
+elseif              return TOKEN(TK_KW_ELSEIF); 
+end                 return TOKEN(TK_KW_END); 
+for                 return TOKEN(TK_KW_FOR); 
+function            return TOKEN(TK_KW_FUNCTION); 
+if                  return TOKEN(TK_KW_IF); 
+in                  return TOKEN(TK_KW_IN); 
+local               return TOKEN(TK_KW_LOCAL); 
+nil                 return TOKEN(TK_KW_NIL); 
+not                 return TOKEN(TK_KW_NOT); 
+or                  return TOKEN(TK_KW_OR); 
+while               return TOKEN(TK_KW_WHILE); 
+repeat              return TOKEN(TK_KW_REPEAT); 
+return              return TOKEN(TK_KW_RETURN); 
+then                return TOKEN(TK_KW_THEN); 
+until               return TOKEN(TK_KW_UNTIL); 
 
-{ID}                return TK_ID; 
+{ID}                SAVE_TOKEN; return TK_ID; 
 
-.                   /* error */
+.                   printf("Uknown token!\n"); yyterminate(); /* error */
 
 %%
