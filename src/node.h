@@ -17,7 +17,7 @@ enum NodeType {
     FUNCTION_DECLARATION
 };
 
-//class CodeGenContext;
+class CodeExecutionContext;
 class NStatement;
 class NExpression;
 class NVariableDeclaration;
@@ -39,6 +39,7 @@ class NExpression : public Node {
 class NStatement : public Node {
 public:
     virtual NodeType type() = 0;
+    virtual void runCode(CodeExecutionContext& context) = 0;
 };
 
 /*
@@ -150,6 +151,7 @@ public:
     NMultiAssignment(IdentifierList idList, ExpressionList expresionList, int isLocal) :
         idList(idList), expresionList(expresionList), isLocal(isLocal) { }
     NodeType type(){ return MULTI_ASSIGNMENT; }
+    void runCode(CodeExecutionContext& context);
 };
 
 class NLastStatement : public NStatement {
@@ -160,6 +162,7 @@ public:
     NLastStatement(int isBreak, ExpressionList& returnList):
         isBreak(isBreak), returnList(returnList) { }
     NodeType type(){ return LAST_STATMENT; }
+    void runCode(CodeExecutionContext& context);
 };
 
 /*
@@ -180,6 +183,8 @@ public:
             this->statements.push_back(*it);
         }
     };
+
+    void runCode(CodeExecutionContext& context);
 };
 
 class NExpressionStatement : public NStatement {
@@ -188,6 +193,8 @@ public:
     NExpressionStatement(NExpression& expression) :
         expression(expression) { }
     NodeType type(){ return EXPRESSION_STATMENT; }
+
+    void runCode(CodeExecutionContext& context);
 };
 
 class NMultiVariableDeclaration : public NStatement {
@@ -197,6 +204,7 @@ public:
     NMultiVariableDeclaration(int isLocal, IdentifierList& idList):
         isLocal(isLocal), idList(idList) { }
     NodeType type(){ return MULTI_VARIABLE_DECLARATION; }
+    void runCode(CodeExecutionContext& context);
 
 };
 
@@ -209,6 +217,7 @@ public:
     NVariableDeclaration(NIdentifier& id, NExpression *assignmentExpr) :
         id(id), assignmentExpr(assignmentExpr) { }
     NodeType type(){ return VARIABLE_DECLARATION; }
+    void runCode(CodeExecutionContext& context);
 };
 
 /*
@@ -228,6 +237,7 @@ public:
     NForLoopIn(IdentifierList nameList, ExpressionList expresionList, NBlock& block) :
         nameList(nameList), expresionList(expresionList), block(block) { }
     NodeType type(){ return FOR_LOOP_IN; }
+    void runCode(CodeExecutionContext& context);
 }; 
 
 /*
@@ -249,6 +259,7 @@ public:
     NForLoopAssign(NIdentifier& id, ExpressionList expresionList, NBlock& block) :
         id(id), expresionList(expresionList), block(block) { }
     NodeType type(){ return FOR_LOOP_ASSIGN; }
+    void runCode(CodeExecutionContext& context);
 };
 
 
@@ -285,6 +296,7 @@ public:
     NFunctionDeclaration(NIdentifier& id, IdentifierList& arguments, NBlock& block) :
         id(id), arguments(arguments), block(block) { }
     NodeType type(){ return FUNCTION_DECLARATION; }
+    void runCode(CodeExecutionContext& context);
 };
 
 #endif NODE_H

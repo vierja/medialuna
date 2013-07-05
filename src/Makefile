@@ -11,5 +11,5 @@ parser.hpp: parser.cpp
 scanner.cpp: scanner.lex parser.hpp
 	lex -o $@ $^
 
-parser: parser.cpp codeexec.cpp main.cpp scanner.cpp
+parser: parser.cpp codeexec.cpp main.cpp scanner.cpp node.cpp
 	g++ -o $@ *.cpp

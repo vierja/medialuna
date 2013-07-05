@@ -1,5 +1,6 @@
 #include <iostream>
 #include "node.h"
+#include "codeexec.h"
 extern NBlock* programBlock;
 extern int yyparse();
 
@@ -14,13 +15,14 @@ int main(int argc, char **argv)
     /*
         Se crea un contexto. Y se corre el bloque principal.
     */
-    //CodeExecutionContext context;
+    CodeExecutionContext context;
     /*
         TODO:
         Falta inicializar el contexto con las funciones basicas de table y print.
     */
-    //context.executeCode(*programBlock);
+    context.executeCode(*programBlock);
 
+    return 1;
 
     StatementList::iterator it;
     /* Recorrero los statements del programBlock */
