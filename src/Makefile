@@ -1,7 +1,7 @@
-all: interpreter
+all: parser
 
 clean:
-	rm parser.cpp parser.hpp parser scanner.cpp *.o
+	rm parser.cpp parser.hpp parser scanner.cpp
 
 parser.cpp: parser.y
 	bison -d -o $@ $^
