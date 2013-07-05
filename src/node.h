@@ -4,7 +4,18 @@
 #include <iostream>
 #include <vector>
 
-/* plagio de http://gnuu.org/2009/09/18/writing-your-own-toy-compiler/4/ */
+/* plagio modificado de http://gnuu.org/2009/09/18/writing-your-own-toy-compiler/4/ */
+
+enum NodeType {
+    MULTI_ASSIGNMENT,
+    LAST_STATMENT,
+    EXPRESSION_STATMENT,
+    MULTI_VARIABLE_DECLARATION,
+    VARIABLE_DECLARATION,
+    FOR_LOOP_IN,
+    FOR_LOOP_ASSIGN,
+    FUNCTION_DECLARATION
+};
 
 //class CodeGenContext;
 class NStatement;
@@ -27,7 +38,7 @@ class NExpression : public Node {
 
 class NStatement : public Node {
 public:
-    virtual std::string str_type() = 0;
+    virtual NodeType type() = 0;
 };
 
 /*
@@ -138,7 +149,7 @@ public:
     int isLocal;
     NMultiAssignment(IdentifierList idList, ExpressionList expresionList, int isLocal) :
         idList(idList), expresionList(expresionList), isLocal(isLocal) { }
-    std::string str_type(){ return std::string( "MultiAssigment" ); }
+    NodeType type(){ return MULTI_ASSIGNMENT; }
 };
 
 class NLastStatement : public NStatement {
@@ -148,7 +159,7 @@ public:
 
     NLastStatement(int isBreak, ExpressionList& returnList):
         isBreak(isBreak), returnList(returnList) { }
-    std::string str_type(){ return std::string( "NLastStatement" ); }
+    NodeType type(){ return LAST_STATMENT; }
 };
 
 /*
@@ -176,7 +187,7 @@ public:
     NExpression& expression;
     NExpressionStatement(NExpression& expression) :
         expression(expression) { }
-    std::string str_type(){ return std::string( "NExpressionStatement" ); }
+    NodeType type(){ return EXPRESSION_STATMENT; }
 };
 
 class NMultiVariableDeclaration : public NStatement {
@@ -185,7 +196,7 @@ public:
     int isLocal;
     NMultiVariableDeclaration(int isLocal, IdentifierList& idList):
         isLocal(isLocal), idList(idList) { }
-    std::string str_type(){ return std::string( "NMultiVariableDeclaration" ); }
+    NodeType type(){ return MULTI_VARIABLE_DECLARATION; }
 
 };
 
@@ -197,7 +208,7 @@ public:
         id(id) { }
     NVariableDeclaration(NIdentifier& id, NExpression *assignmentExpr) :
         id(id), assignmentExpr(assignmentExpr) { }
-    std::string str_type(){ return std::string( "NVariableDeclaration" ); }
+    NodeType type(){ return VARIABLE_DECLARATION; }
 };
 
 /*
@@ -216,7 +227,7 @@ public:
     NBlock& block;
     NForLoopIn(IdentifierList nameList, ExpressionList expresionList, NBlock& block) :
         nameList(nameList), expresionList(expresionList), block(block) { }
-    std::string str_type(){ return std::string( "NForLoopIn" ); }
+    NodeType type(){ return FOR_LOOP_IN; }
 }; 
 
 /*
@@ -237,7 +248,7 @@ public:
     NBlock& block;
     NForLoopAssign(NIdentifier& id, ExpressionList expresionList, NBlock& block) :
         id(id), expresionList(expresionList), block(block) { }
-    std::string str_type(){ return std::string( "NForLoopAssign" ); }
+    NodeType type(){ return FOR_LOOP_ASSIGN; }
 };
 
 
@@ -273,7 +284,7 @@ public:
     NBlock& block;
     NFunctionDeclaration(NIdentifier& id, IdentifierList& arguments, NBlock& block) :
         id(id), arguments(arguments), block(block) { }
-    std::string str_type(){ return std::string( "NFunctionDeclaration" ); }
+    NodeType type(){ return FUNCTION_DECLARATION; }
 };
 
 #endif NODE_H
