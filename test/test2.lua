@@ -1,14 +1,7 @@
-function get_all_factors(number)
-    --[[--
-    Gets all of the factors of a given number
-    
-    @Parameter: number
-        The number to find the factors of
+function get_all_factors(number, shit)
 
-    @Returns: A table of factors of the number
-    --]]--
     local factors = {}
-    for possible_factor=1, math.sqrt(number), 1 do
+    for possible_factor=1, sqrt(number), 1 do
         local remainder = number%possible_factor
         
         if remainder == 0 then

@@ -5,11 +5,6 @@ end
 
 test_function(name)
 
---[[
-    Mi nombre es Javier
-
-]]
-
 function hello( what, is, this )
     what = [[
         Sin linea arriba""'''
