@@ -78,3 +78,18 @@ print("1" ^ 3);
 print("10" ^ "2");
 print("1" ^ 0.3);
 print(1.1 ^ 1.2);
+
+-- UNARY
+
+-- -
+
+print(-"1");
+print(-"-10"); -- TODO : ANDA MAL.
+print(-10);
+
+-- not
+
+print(not nil)
+print(not false)
+print(not true)
+print(not "a")

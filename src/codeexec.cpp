@@ -146,8 +146,12 @@ void CodeExecutionContext::print_expr(NExpression* expr){
                 this->print_expr(val);
             }
             break;
-        case UNARY_OPERATOR:
-            cout << "UNARY_OPERATOR -> NOT IMPLEMENTED" << endl;
+        case UNARY_OPERATOR:{
+                DEBUG_PRINT((YELLOW"Se va a imprimir una expresion unaria\n"RESET));
+                NUnaryOperator* unOp = dynamic_cast<NUnaryOperator*>(expr);
+                NExpression* val = unOp->evaluate(*this);
+                this->print_expr(val);
+            }
             break;
         case BLOCK:
             cout << "BLOCK -> NOT IMPLEMENTED" << endl;

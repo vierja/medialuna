@@ -438,7 +438,7 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             Si alguna de las expressiones es string entonces se intenta pasar a numero.
             Si falla la conversion entonces falla el operador.
         */
-        DEBUG_PRINT((YELLOW"Se evalua operator\n"RESET));
+        DEBUG_PRINT((YELLOW"Se evalua operator de numeros\n"RESET));
         NodeType ltype = lhs.type();
         NodeType rtype = rhs.type();
         NExpression* lEvalExpression;
@@ -556,7 +556,100 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
 }
 
 NExpression* NUnaryOperator::evaluate(CodeExecutionContext& context){
-    
+    if (op == TK_OP_MINUS) {
+        /*
+            Negativo de la expression. Solo para numeros o string pasandolos a numeros.
+        */
+        // Evaluo la expresion si es necesario.
+        DEBUG_PRINT((YELLOW"Se evalua '-' unario\n"RESET));
+        NodeType rtype = rhs.type();
+        NExpression* rEvalExpression;
+
+        if (rtype == IDENTIFIER || rtype == FUNCTION_CALL || rtype == BINARY_OPERATOR || rtype == UNARY_OPERATOR || rtype == BLOCK || rtype == ANON_FUNCTION_DECLARATION){
+            DEBUG_PRINT((YELLOW" - rhs es de tipo %s. Se evalua.\n"RESET, rhs.type_str().c_str()));
+            rEvalExpression = rhs.evaluate(context);
+            rtype = rEvalExpression->type();
+            DEBUG_PRINT((YELLOW" - ahora rhs es de tipo %s.\n"RESET, rEvalExpression->type_str().c_str()));
+        } else {
+            DEBUG_PRINT((YELLOW" - rhs no es de tipo dinamico (%s). No se evalua.\n"RESET, rhs.type_str().c_str()));
+            rEvalExpression = &rhs;
+        }
+
+        if (rtype != STRING && rtype != INTEGER && rtype != DOUBLE){
+            cout << "ERROR: Invalid value expression for unary '-'.\n";
+            exit(0);
+        }
+
+        if (rtype == INTEGER) {
+            long rIntVal = (dynamic_cast<NInteger*>(rEvalExpression))->value;
+            rIntVal = -rIntVal;
+            NInteger* resNumber = new NInteger(rIntVal);
+            return resNumber;
+        }
+
+        double rDoubleValue;
+        // Si es String lo tratamos de pasar a double, o si fallamos a integer.
+        if (rtype == STRING) {
+            // Primero tratamos a double.
+            istringstream ss((dynamic_cast<NString*>(rEvalExpression))->value);
+            if (!(ss >> rDoubleValue)){
+                // No es double.
+                cout << "ERROR: Invalid string value for unary '-'.\n";
+                exit(0);
+            }
+        } else if (rtype == DOUBLE) {
+            // Si left es double entonces right lo va a ser tambien (por que int int ya termino.)
+            rDoubleValue = (dynamic_cast<NDouble*>(rEvalExpression))->value;
+            DEBUG_PRINT((GREEN" - Se obtiene el res del double: %f\n"RESET, rDoubleValue));
+        }
+
+        NDouble* resNumber = new NDouble(rDoubleValue);
+        return resNumber;
+
+
+
+    } else if (op == TK_KW_NOT) {
+        /*
+            Negativo de la evaluacion.
+            El operador not devuelve solo true o false
+            En los unicos casos que devuelve True es en los casos
+            que la expression es False o Nil.
+            En el resto devuelve valse.
+        */
+
+        // Evaluo la expresion si es necesario.
+        DEBUG_PRINT((YELLOW"Se evalua 'not'\n"RESET));
+        NodeType rtype = rhs.type();
+        NExpression* rEvalExpression;
+
+        if (rtype == IDENTIFIER || rtype == FUNCTION_CALL || rtype == BINARY_OPERATOR || rtype == UNARY_OPERATOR || rtype == BLOCK || rtype == ANON_FUNCTION_DECLARATION){
+            DEBUG_PRINT((YELLOW" - rhs es de tipo %s. Se evalua.\n"RESET, rhs.type_str().c_str()));
+            rEvalExpression = rhs.evaluate(context);
+            rtype = rEvalExpression->type();
+            DEBUG_PRINT((YELLOW" - ahora rhs es de tipo %s.\n"RESET, rEvalExpression->type_str().c_str()));
+        } else {
+            DEBUG_PRINT((YELLOW" - rhs no es de tipo dinamico (%s). No se evalua.\n"RESET, rhs.type_str().c_str()));
+            rEvalExpression = &rhs;
+        }
+
+        if (rtype == BOOLEAN) {
+            NBoolean* boolean = dynamic_cast<NBoolean*>(rEvalExpression);
+            // Si es False entonces True.
+            if (boolean->trueVal == 0){
+                NBoolean* resBoolean = new NBoolean(1);
+                return resBoolean;
+            }
+        }
+
+        if (rtype == NIL) {
+            NBoolean* resBoolean = new NBoolean(1);
+            return resBoolean;
+        }
+
+        // Else devuelvo false.
+        NBoolean* resBoolean = new NBoolean(0);
+        return resBoolean;
+    }
 }
 
 NExpression* NBlock::evaluate(CodeExecutionContext& context){
