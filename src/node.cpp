@@ -1,13 +1,17 @@
 #include "node.h"
 #include "codeexec.h"
 #include "parser.hpp"
+#include <math.h>
+#include <sstream>
+#include <iostream>
 
 using namespace std;
 
 void NBlock::runCode(CodeExecutionContext& context) {
-    cout << "NBlock::runCode" << endl;
+    DEBUG_PRINT((RED"NBlock::runCode\n"RESET));
+    DEBUG_PRINT((GREEN" - Size de statments: %i\n"RESET, (int)statements.size()));
     StatementList::const_iterator it;
-    cout << "Size de statments: " <<  statements.size() << endl;
+
     for (it = statements.begin(); it != statements.end(); it++){
         cout << "Running code for ";
         cout << typeid(**it).name() << endl;
@@ -74,7 +78,7 @@ void NExpressionStatement::runCode(CodeExecutionContext& context) {
     */
     /* TODO: Esto deberia de arreglarse en el parser. */
     if (expression.type() != FUNCTION_CALL){
-        cout << "Unexpected expression." << endl;
+        cout << "ERROR: Unexpected expression.\n";
         exit(1);
     }
     cout << "NExpressionStatement::runCode" << endl;
@@ -116,7 +120,6 @@ NExpression* NIdentifier::evaluate(CodeExecutionContext& context){
 
 NExpression* NFunctionCall::evaluate(CodeExecutionContext& context){
     cout << "NFunctionCall::evaluate\n";
-    con
 }
 
 NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
@@ -135,6 +138,7 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             ANON_FUNCTION_DECLARATION
     */
     if (op == TK_KW_OR) {
+        DEBUG_PRINT((YELLOW"Se evalua operator OR\n"RESET));
         NodeType ltype = lhs.type();
         NExpression* lEvalExpression;
 
@@ -190,7 +194,7 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
         // Si el primero es booleano False, se devuelve False.
         if (ltype == BOOLEAN){
             NBoolean* boolean = dynamic_cast<NBoolean*>(&lhs);
-            if (!boolean->trueVal){
+            if (boolean->trueVal == 0){
                 return &lhs;
             }
         }
@@ -198,21 +202,28 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
         // En el resto de los casos se devuelve el segundo.
         return rhs.evaluate(context);
     } else if (op == TK_OP_EQUALS || op == TK_OP_DIFF) {
+        DEBUG_PRINT((YELLOW"Se evalua == o ~==\n"RESET));
         NodeType ltype = lhs.type();
-        NodeType rtype = lhs.type();
+        NodeType rtype = rhs.type();
         NExpression* lEvalExpression;
         NExpression* rEvalExpression;
 
         if (ltype == IDENTIFIER || ltype == FUNCTION_CALL || ltype == BINARY_OPERATOR || ltype == UNARY_OPERATOR || ltype == BLOCK || ltype == ANON_FUNCTION_DECLARATION){
+            DEBUG_PRINT((YELLOW" - lhs es de tipo %s. Se evalua.\n"RESET, lhs.type_str().c_str()));
             lEvalExpression = lhs.evaluate(context);
             ltype = lEvalExpression->type();
+            DEBUG_PRINT((YELLOW" - ahora lhs es de tipo %s.\n"RESET, lEvalExpression->type_str().c_str()));
         } else {
+            DEBUG_PRINT((YELLOW" - lhs no es de tipo dinamico (%s). No se evalua.\n"RESET, lhs.type_str().c_str()));
             lEvalExpression = &lhs;
         }
         if (rtype == IDENTIFIER || rtype == FUNCTION_CALL || rtype == BINARY_OPERATOR || rtype == UNARY_OPERATOR || rtype == BLOCK || rtype == ANON_FUNCTION_DECLARATION){
+            DEBUG_PRINT((YELLOW" - rhs es de tipo %s. Se evalua.\n"RESET, rhs.type_str().c_str()));
             rEvalExpression = rhs.evaluate(context);
             rtype = rEvalExpression->type();
+            DEBUG_PRINT((YELLOW" - ahora rhs es de tipo %s.\n"RESET, rEvalExpression->type_str().c_str()));
         } else {
+            DEBUG_PRINT((YELLOW" - rhs no es de tipo dinamico (%s). No se evalua.\n"RESET, rhs.type_str().c_str()));
             rEvalExpression = &rhs;
         }
 
@@ -225,7 +236,7 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
                 if (op == TK_OP_EQUALS)
                     trueVal = 0;
                 else
-                    trueVal = 1
+                    trueVal = 1;
                 NBoolean* booleanResult = new NBoolean(trueVal);
                 return booleanResult;
             }
@@ -248,19 +259,22 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             // nil == nil es true
             int trueVal;
             if (op == TK_OP_EQUALS)
-                trueVal = 0;
+                trueVal = 1;
             else
-                trueVal = 1
+                trueVal = 0;
             NBoolean* booleanResult = new NBoolean(trueVal);
             return booleanResult;
         }
 
         if (ltype == BOOLEAN){
             int intResult = 0;
-            NBoolean* lBoolean = dynamic_cast<NBoolean*>(&lhs);
-            NBoolean* rBoolean = dynamic_cast<NBoolean*>(&lhs);
+            NBoolean* lBoolean = dynamic_cast<NBoolean*>(lEvalExpression);
+            NBoolean* rBoolean = dynamic_cast<NBoolean*>(rEvalExpression);
             if ((lBoolean->trueVal == rBoolean->trueVal && op == TK_OP_EQUALS) || (lBoolean->trueVal != rBoolean->trueVal && op == TK_OP_DIFF)){
+                DEBUG_PRINT((RED"   - Los dos son booleanos iguales: True.\n"RESET));
                 intResult = 1;
+            } else {
+                DEBUG_PRINT((RED"   - Los dos son booleanos pero distintos: False.\n"RESET));
             }
             NBoolean* booleanResult = new NBoolean(intResult);
             return booleanResult;
@@ -268,8 +282,8 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
 
         if (ltype == STRING){
             int intResult = 0;
-            NString* lString = dynamic_cast<NString*>(&lhs);
-            NString* rString = dynamic_cast<NString*>(&lhs);
+            NString* lString = dynamic_cast<NString*>(lEvalExpression);
+            NString* rString = dynamic_cast<NString*>(rEvalExpression);
             if ((lString->value.compare(rString->value) == 0 && op == TK_OP_EQUALS) || (lString->value.compare(rString->value) != 0 && op == TK_OP_DIFF)){
                 intResult = 1;
             }
@@ -282,18 +296,18 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             double lValue;
             double rValue;
             if (ltype == INTEGER){
-                NInteger* lInteger = dynamic_cast<NInteger*>(&lhs);
+                NInteger* lInteger = dynamic_cast<NInteger*>(lEvalExpression);
                 lValue = lInteger->value;    
             } else {
-                NDouble* lDouble = dynamic_cast<NDouble*>(&lhs);
+                NDouble* lDouble = dynamic_cast<NDouble*>(lEvalExpression);
                 lValue = lDouble->value;    
             }
 
             if (rtype == INTEGER){
-                NInteger* rInteger = dynamic_cast<NInteger*>(&lhs);
+                NInteger* rInteger = dynamic_cast<NInteger*>(rEvalExpression);
                 rValue = rInteger->value;    
             } else {
-                NDouble* rDouble = dynamic_cast<NDouble*>(&lhs);
+                NDouble* rDouble = dynamic_cast<NDouble*>(rEvalExpression);
                 rValue = rDouble->value;    
             }
             
@@ -303,7 +317,7 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             NBoolean* booleanResult = new NBoolean(intResult);
             return booleanResult;
         }
-    } else if (op == TK_OP_MIN_EQUALS || op == TK_OP_GRT_EQUALS){
+    } else if (op == TK_OP_MIN_EQUALS || op == TK_OP_GRT_EQUALS) {
         /*
             primer caso:
             a =< b
@@ -315,6 +329,7 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             b =< a
         */
 
+        DEBUG_PRINT((YELLOW"Se evalua operator <= o =>\n"RESET));
         NExpression* lefths;
         NExpression* righths;
 
@@ -330,7 +345,7 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
 
         /* TODO: Implementar logica */
 
-    } else if (op == TK_OP_MIN || op == TK_OP_GRT){
+    } else if (op == TK_OP_MIN || op == TK_OP_GRT) {
         /*
             Al igual que con TK_OP_MIN_EQUALS y TK_OP_GRT_EQUALS
             cuando tenemos TK_OP_GRT invertimos de lugar para 
@@ -350,6 +365,193 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
         }
 
         /* TODO: Implementar logica */
+    } else if (op == TK_OP_DOTDOT){
+        /*
+        `..` es la operacion de concatenacion.
+        Se puede realizar solo a STRING, o NUMBER
+        */
+        DEBUG_PRINT((YELLOW"Se evalua '..'\n"RESET));
+        NodeType ltype = lhs.type();
+        NodeType rtype = rhs.type();
+        NExpression* lEvalExpression;
+        NExpression* rEvalExpression;
+
+        if (ltype == IDENTIFIER || ltype == FUNCTION_CALL || ltype == BINARY_OPERATOR || ltype == UNARY_OPERATOR || ltype == BLOCK || ltype == ANON_FUNCTION_DECLARATION){
+            DEBUG_PRINT((YELLOW" - lhs es de tipo %s. Se evalua.\n"RESET, lhs.type_str().c_str()));
+            lEvalExpression = lhs.evaluate(context);
+            ltype = lEvalExpression->type();
+            DEBUG_PRINT((YELLOW" - ahora lhs es de tipo %s.\n"RESET, lEvalExpression->type_str().c_str()));
+        } else {
+            DEBUG_PRINT((YELLOW" - lhs no es de tipo dinamico (%s). No se evalua.\n"RESET, lhs.type_str().c_str()));
+            lEvalExpression = &lhs;
+        }
+        if (rtype == IDENTIFIER || rtype == FUNCTION_CALL || rtype == BINARY_OPERATOR || rtype == UNARY_OPERATOR || rtype == BLOCK || rtype == ANON_FUNCTION_DECLARATION){
+            DEBUG_PRINT((YELLOW" - rhs es de tipo %s. Se evalua.\n"RESET, rhs.type_str().c_str()));
+            rEvalExpression = rhs.evaluate(context);
+            rtype = rEvalExpression->type();
+            DEBUG_PRINT((YELLOW" - ahora rhs es de tipo %s.\n"RESET, rEvalExpression->type_str().c_str()));
+        } else {
+            DEBUG_PRINT((YELLOW" - rhs no es de tipo dinamico (%s). No se evalua.\n"RESET, rhs.type_str().c_str()));
+            rEvalExpression = &rhs;
+        }
+
+        if ((ltype != STRING && ltype != INTEGER && ltype != DOUBLE) || (rtype != STRING && rtype != INTEGER && rtype != DOUBLE)){
+            cout << "ERROR: Invalid value for `..` (concat).\n";
+            exit(0);
+        }
+
+        // Paso los valores a string y luego los concateno.
+        string lstring;
+        string rstring;
+        // Para hacer las conversiones.
+        stringstream rstrstream, lstrstream;
+
+        if (ltype == STRING) {
+            lstring = (dynamic_cast<NString*>(lEvalExpression))->value;
+        } else if (ltype == INTEGER) {
+            lstrstream << (dynamic_cast<NInteger*>(lEvalExpression))->value;
+            lstrstream >> lstring;
+        } else if (ltype == DOUBLE) {
+            lstrstream << (dynamic_cast<NDouble*>(lEvalExpression))->value;
+            lstrstream >> lstring;
+        }
+        DEBUG_PRINT((YELLOW" - lhs = '%s'.\n"RESET, lstring.c_str()));
+
+        if (rtype == STRING) {
+            rstring = (dynamic_cast<NString*>(rEvalExpression))->value;
+        } else if (rtype == INTEGER) {
+            rstrstream << (dynamic_cast<NInteger*>(rEvalExpression))->value;
+            rstrstream >> rstring;
+        } else if (rtype == DOUBLE) {
+            rstrstream << (dynamic_cast<NDouble*>(rEvalExpression))->value;
+            rstrstream >> rstring;
+        }
+        DEBUG_PRINT((YELLOW" - rhs = '%s'.\n"RESET, rstring.c_str()));
+
+        string result = lstring + rstring;
+        NString* resString = new NString(result);
+        return resString;
+
+    } else if (op == TK_OP_PLUS || op == TK_OP_MINUS || op == TK_OP_TIMES || op == TK_OP_DIVIDED || op == TK_OP_MOD || op == TK_OP_EXP) {
+        /*
+            Las operaciones numericas. 
+            Si alguna de las expressiones es string entonces se intenta pasar a numero.
+            Si falla la conversion entonces falla el operador.
+        */
+        DEBUG_PRINT((YELLOW"Se evalua operator\n"RESET));
+        NodeType ltype = lhs.type();
+        NodeType rtype = rhs.type();
+        NExpression* lEvalExpression;
+        NExpression* rEvalExpression;
+
+        if (ltype == IDENTIFIER || ltype == FUNCTION_CALL || ltype == BINARY_OPERATOR || ltype == UNARY_OPERATOR || ltype == BLOCK || ltype == ANON_FUNCTION_DECLARATION){
+            DEBUG_PRINT((YELLOW" - lhs es de tipo %s. Se evalua.\n"RESET, lhs.type_str().c_str()));
+            lEvalExpression = lhs.evaluate(context);
+            ltype = lEvalExpression->type();
+            DEBUG_PRINT((YELLOW" - ahora lhs es de tipo %s.\n"RESET, lEvalExpression->type_str().c_str()));
+        } else {
+            DEBUG_PRINT((YELLOW" - lhs no es de tipo dinamico (%s). No se evalua.\n"RESET, lhs.type_str().c_str()));
+            lEvalExpression = &lhs;
+        }
+        if (rtype == IDENTIFIER || rtype == FUNCTION_CALL || rtype == BINARY_OPERATOR || rtype == UNARY_OPERATOR || rtype == BLOCK || rtype == ANON_FUNCTION_DECLARATION){
+            DEBUG_PRINT((YELLOW" - rhs es de tipo %s. Se evalua.\n"RESET, rhs.type_str().c_str()));
+            rEvalExpression = rhs.evaluate(context);
+            rtype = rEvalExpression->type();
+            DEBUG_PRINT((YELLOW" - ahora rhs es de tipo %s.\n"RESET, rEvalExpression->type_str().c_str()));
+        } else {
+            DEBUG_PRINT((YELLOW" - rhs no es de tipo dinamico (%s). No se evalua.\n"RESET, rhs.type_str().c_str()));
+            rEvalExpression = &rhs;
+        }
+
+        if ((ltype != STRING && ltype != INTEGER && ltype != DOUBLE) || (rtype != STRING && rtype != INTEGER && rtype != DOUBLE)){
+            cout << "ERROR: Invalid value expression.\n";
+            exit(0);
+        }
+
+        // Si los dos valores son Integer entonces el resultado es INT.
+        if (ltype == INTEGER && rtype == INTEGER) {
+            DEBUG_PRINT((YELLOW" - Ambos son integer. Obtengo los valores.\n"RESET));
+
+            long lIntVal = (dynamic_cast<NInteger*>(lEvalExpression))->value;
+            long rIntVal = (dynamic_cast<NInteger*>(rEvalExpression))->value;
+
+            DEBUG_PRINT((YELLOW" - Ambos son integer: lIntVal: %ld, rIntVal: %ld\n"RESET, lIntVal, rIntVal));
+
+            long intResult;
+            if (op == TK_OP_PLUS) {
+                intResult = lIntVal + rIntVal;
+            } else if (op == TK_OP_MINUS) {
+                intResult = lIntVal - rIntVal;
+            } else if (op == TK_OP_TIMES) {
+                intResult = lIntVal * rIntVal;
+            } else if (op == TK_OP_MOD) {
+                intResult = lIntVal % rIntVal;
+            } else if (op == TK_OP_EXP){
+                intResult = pow(lIntVal, rIntVal);
+            } else if (op == TK_OP_DIVIDED) {
+                double dResult = (double)lIntVal / (double)rIntVal;
+                NDouble* doubleResult = new NDouble(dResult);
+                return doubleResult;
+            }
+
+            NInteger* integerResult = new NInteger(intResult);
+            return integerResult;
+        }
+
+        double lDoubleValue;
+        // Si es String lo tratamos de pasar a double, o si fallamos a integer.
+        if (ltype == STRING) {
+            // Primero tratamos a double.
+            istringstream ss((dynamic_cast<NString*>(lEvalExpression))->value);
+            if (!(ss >> lDoubleValue)){
+                // No es double.
+                cout << "ERROR: Invalid string value for left side expression.\n";
+                exit(0);
+            }
+        } else if (ltype == DOUBLE) {
+            // Si left es double entonces right lo va a ser tambien (por que int int ya termino.)
+            lDoubleValue = (dynamic_cast<NDouble*>(lEvalExpression))->value;
+            DEBUG_PRINT((GREEN" - Se obtiene el res del double: %f\n"RESET, lDoubleValue));
+        } else if (ltype == INTEGER) {
+            lDoubleValue = (double)(dynamic_cast<NInteger*>(lEvalExpression))->value;
+        }
+
+        double rDoubleValue;
+        // Si es String lo tratamos de pasar a double, o si fallamos a integer.
+        if (rtype == STRING) {
+            // Primero tratamos a double.
+            istringstream ss((dynamic_cast<NString*>(rEvalExpression))->value);
+            if (!(ss >> rDoubleValue)){
+                // No es double.
+                cout << "ERROR: Invalid string value for right side expression.\n";
+                exit(0);
+            }
+        } else if (rtype == DOUBLE) {
+            // Si left es double entonces right lo va a ser tambien (por que int int ya termino.)
+            rDoubleValue = (dynamic_cast<NDouble*>(rEvalExpression))->value;
+        } else if (rtype == INTEGER) {
+            rDoubleValue = (double)(dynamic_cast<NInteger*>(rEvalExpression))->value;
+        }
+
+        double dResult;
+        if (op == TK_OP_PLUS) {
+            dResult = lDoubleValue + rDoubleValue;
+        } else if (op == TK_OP_MINUS) {
+            dResult = lDoubleValue - rDoubleValue;
+        } else if (op == TK_OP_TIMES) {
+            dResult = lDoubleValue * rDoubleValue;
+        } else if (op == TK_OP_DIVIDED) {
+            dResult = lDoubleValue / rDoubleValue;
+        } else if (op == TK_OP_MOD) {
+            dResult = fmod(lDoubleValue,rDoubleValue);
+        } else if (op == TK_OP_EXP){
+            dResult = pow(lDoubleValue, rDoubleValue);
+        }
+        NDouble* doubleResult = new NDouble(dResult);
+        return doubleResult;
+    } else {
+        cout << "ERROR: Unknown operator.\n";
+        exit(0);
     }
 }
 

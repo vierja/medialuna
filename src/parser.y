@@ -304,13 +304,18 @@ exp         : TK_KW_NIL
             }
             | TK_STRING
             {
-                $$ = new NString(*$1);
+                std::string* final = new std::string($1->substr(1, $1->size()-2));
+                $$ = new NString(*final);
             }
             | TK_BOOLEAN
             {
                 /* chanchada */
                 std::string trueStr ("true");
-                $$ = new NBoolean($1->compare(trueStr));
+                int trueVal = 0;
+                if ($1->compare(trueStr) == 0){
+                    trueVal = 1;
+                }
+                $$ = new NBoolean(trueVal);
             }
             | TK_NUMBER_INT
             {
@@ -456,14 +461,14 @@ prefixexp   : var
             }
             /* Lo ignoro porque no entiendo de donde sale y puede ser el que esta dando error.
             Edit1: Probando fue el que saco el conflicto.
-
+            */
             | TK_OP_OPEN_PAREN exp TK_OP_CLOS_PAREN
             {
-                /*
-                    exp obviamente es de tipo NExpresion, pueden ser varios.
+                
+                // exp obviamente es de tipo NExpresion, pueden ser varios.
                 
                 $$ = $2
-            }*/
+            }
             ;
 
 functioncal :

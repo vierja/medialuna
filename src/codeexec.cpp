@@ -31,7 +31,6 @@ NExpression* CodeExecutionContext::getVariable(string name){
         // Busco si la funcion de nombre `name` esta definida en el mapa de funciones.
         var_it = (**it).variables.find(name);
         if (var_it != (**it).variables.end()){
-            cout << "CodeExecutionContext::getVariable " << name << endl;;
             return var_it->second;
         }
     }
@@ -92,6 +91,7 @@ void CodeExecutionContext::print(ExpressionList exprList){
     ExpressionList::const_iterator exp_it;
     ExpressionList::const_iterator final_it = exprList.end();
     --final_it;
+    DEBUG_PRINT((GREEN"Se tienen %d expressions para imprimir\n"RESET, (int) exprList.size()));
     for (exp_it = exprList.begin(); exp_it != exprList.end(); exp_it++){
         this->print_expr((*exp_it));
         // TODO: Si no es la ultima, imprimo 1 tab.
@@ -122,7 +122,7 @@ void CodeExecutionContext::print_expr(NExpression* expr){
             break;
         case STRING: {
                 string value = (dynamic_cast<NString*>(expr))->value;
-                cout << value.substr(1, value.size()-2);
+                cout << value;
             }
             break;
         case IDENTIFIER: {
@@ -140,6 +140,7 @@ void CodeExecutionContext::print_expr(NExpression* expr){
             cout << "FUNCTION_CALL -> NOT IMPLEMENTED" << endl;
             break;
         case BINARY_OPERATOR: {
+                DEBUG_PRINT((YELLOW"Se va a imprimir una expresion binaria\n"RESET));
                 NBinaryOperator* binOp = dynamic_cast<NBinaryOperator*>(expr);
                 NExpression* val = binOp->evaluate(*this);
                 this->print_expr(val);

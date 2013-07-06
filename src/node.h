@@ -3,6 +3,33 @@
 
 #include <iostream>
 #include <vector>
+#include <sstream>
+
+#define DEBUG
+
+#define RESET   "\033[0m"
+#define BLACK   "\033[30m"      /* Black */
+#define RED     "\033[31m"      /* Red */
+#define GREEN   "\033[32m"      /* Green */
+#define YELLOW  "\033[33m"      /* Yellow */
+#define BLUE    "\033[34m"      /* Blue */
+#define MAGENTA "\033[35m"      /* Magenta */
+#define CYAN    "\033[36m"      /* Cyan */
+#define WHITE   "\033[37m"      /* White */
+#define BOLDBLACK   "\033[1m\033[30m"      /* Bold Black */
+#define BOLDRED     "\033[1m\033[31m"      /* Bold Red */
+#define BOLDGREEN   "\033[1m\033[32m"      /* Bold Green */
+#define BOLDYELLOW  "\033[1m\033[33m"      /* Bold Yellow */
+#define BOLDBLUE    "\033[1m\033[34m"      /* Bold Blue */
+#define BOLDMAGENTA "\033[1m\033[35m"      /* Bold Magenta */
+#define BOLDCYAN    "\033[1m\033[36m"      /* Bold Cyan */
+#define BOLDWHITE   "\033[1m\033[37m"      /* Bold White */
+// Macro para imprimir mensajes de debuggeo.
+#ifdef DEBUG
+#define DEBUG_PRINT(x) printf x
+#else
+#define DEBUG_PRINT(x) do {} while (0)
+#endif
 
 /* plagio modificado de http://gnuu.org/2009/09/18/writing-your-own-toy-compiler/4/ */
 
@@ -48,6 +75,7 @@ public:
 class NExpression : public Node {
 public:
     virtual NodeType type() { return EXPRESSION; };
+    virtual std::string type_str() { return "EXPRESSION"; };
     virtual NExpression* evaluate(CodeExecutionContext& context) = 0;
 };
 
@@ -55,6 +83,7 @@ class NStatement : public Node {
 public:
     virtual NodeType type() = 0;
     virtual void runCode(CodeExecutionContext& context) = 0;
+    virtual std::string type_str() = 0;
 };
 
 /*
@@ -100,6 +129,7 @@ class NNil : public NExpression {
 public:
     NNil() { }
     NodeType type(){ return NIL; }
+    std::string type_str(){ return "NIL"; }
     NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
@@ -113,6 +143,7 @@ public:
     int trueVal;
     NBoolean(int trueVal) : trueVal(trueVal) { }
     NodeType type(){ return BOOLEAN; }
+    std::string type_str(){ return "BOOLEAN"; }
     NExpression* evaluate(CodeExecutionContext& context){ return this; }
 };
 
@@ -121,6 +152,7 @@ public:
     long long value;
     NInteger(long long value) : value(value) { }
     NodeType type(){ return INTEGER; }
+    std::string type_str(){ return "INTEGER"; }
     NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
@@ -129,6 +161,7 @@ public:
     double value;
     NDouble(double value) : value(value) { }
     NodeType type(){ return DOUBLE; }
+    std::string type_str(){ return "DOUBLE"; }
     NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
@@ -137,6 +170,7 @@ public:
     std::string value;
     NString(const std::string& value) : value(value) { }
     NodeType type(){ return STRING; }
+    std::string type_str(){ return "STRING"; }
     NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
@@ -145,6 +179,7 @@ public:
     std::string name;
     NIdentifier(const std::string& name) : name(name) { }
     NodeType type(){ return IDENTIFIER; }
+    std::string type_str(){ return "IDENTIFIER"; }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -175,6 +210,7 @@ public:
         id(id), arguments(arguments) { }
     NFunctionCall(NIdentifier& id) : id(id) { }
     NodeType type(){ return FUNCTION_CALL; }
+    std::string type_str(){ return "FUNCTION_CALL"; }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -186,6 +222,7 @@ public:
     NBinaryOperator(int op, NExpression& lhs, NExpression& rhs) :
         op(op), lhs(lhs), rhs(rhs) { }
     NodeType type(){ return BINARY_OPERATOR; }
+    std::string type_str(){ return "BINARY_OPERATOR"; }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -196,6 +233,7 @@ public:
     NUnaryOperator(NExpression& rhs, int op) :
         rhs(rhs), op(op) { }
     NodeType type(){ return UNARY_OPERATOR; }
+    std::string type_str(){ return "UNARY_OPERATOR"; }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -217,6 +255,7 @@ public:
     NMultiAssignment(IdentifierList idList, ExpressionList expresionList, int isLocal) :
         idList(idList), expresionList(expresionList), isLocal(isLocal) { }
     NodeType type(){ return MULTI_ASSIGNMENT; }
+    std::string type_str(){ return "MULTI_ASSIGNMENT"; }
     void runCode(CodeExecutionContext& context);
 };
 
@@ -228,6 +267,7 @@ public:
     NLastStatement(int isBreak, ExpressionList& returnList):
         isBreak(isBreak), returnList(returnList) { }
     NodeType type(){ return LAST_STATMENT; }
+    std::string type_str(){ return "LAST_STATMENT"; }
     void runCode(CodeExecutionContext& context);
 };
 
@@ -252,6 +292,7 @@ public:
 
     void runCode(CodeExecutionContext& context);
     NodeType type(){ return BLOCK; }
+    std::string type_str(){ return "BLOCK"; }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -261,6 +302,7 @@ public:
     NExpressionStatement(NExpression& expression) :
         expression(expression) { }
     NodeType type(){ return EXPRESSION_STATMENT; }
+    std::string type_str(){ return "EXPRESSION_STATMENT"; }
 
     void runCode(CodeExecutionContext& context);
 };
@@ -272,6 +314,7 @@ public:
     NMultiVariableDeclaration(int isLocal, IdentifierList& idList):
         isLocal(isLocal), idList(idList) { }
     NodeType type(){ return MULTI_VARIABLE_DECLARATION; }
+    std::string type_str(){ return "MULTI_VARIABLE_DECLARATION"; }
     void runCode(CodeExecutionContext& context);
 
 };*/
@@ -285,6 +328,7 @@ public:
     NVariableDeclaration(NIdentifier& id, NExpression *assignmentExpr) :
         id(id), assignmentExpr(assignmentExpr) { }
     NodeType type(){ return VARIABLE_DECLARATION; }
+    std::string type_str(){ return "VARIABLE_DECLARATION"; }
     void runCode(CodeExecutionContext& context);
 };
 
@@ -305,6 +349,7 @@ public:
     NForLoopIn(IdentifierList nameList, ExpressionList expresionList, NBlock& block) :
         nameList(nameList), expresionList(expresionList), block(block) { }
     NodeType type(){ return FOR_LOOP_IN; }
+    std::string type_str(){ return "FOR_LOOP_IN"; }
     void runCode(CodeExecutionContext& context);
 }; 
 
@@ -327,6 +372,7 @@ public:
     NForLoopAssign(NIdentifier& id, ExpressionList expresionList, NBlock& block) :
         id(id), expresionList(expresionList), block(block) { }
     NodeType type(){ return FOR_LOOP_ASSIGN; }
+    std::string type_str(){ return "FOR_LOOP_ASSIGN"; }
     void runCode(CodeExecutionContext& context);
 };
 
@@ -346,6 +392,7 @@ public:
     NAnonFunctionDeclaration(IdentifierList& arguments, NBlock& block) :
         arguments(arguments), block(block) { }
     NodeType type(){ return ANON_FUNCTION_DECLARATION; }
+    std::string type_str(){ return "ANON_FUNCTION_DECLARATION"; }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -366,6 +413,7 @@ public:
     NFunctionDeclaration(NIdentifier& id, IdentifierList& arguments, NBlock& block) :
         id(id), arguments(arguments), block(block) { }
     NodeType type(){ return FUNCTION_DECLARATION; }
+    std::string type_str(){ return "FUNCTION_DECLARATION"; }
     void runCode(CodeExecutionContext& context);
 };
 
