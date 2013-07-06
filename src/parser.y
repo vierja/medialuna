@@ -104,7 +104,7 @@ block       : scope statlist
                 */
                 /* Creo un LastStatment trucho (return sin valores) */
                 ExpressionList* emptyExprList = new ExpressionList();
-                NLastStatement* last = new NLastStatement(0, *emptyExprList);
+                NLastStatement* last = new NLastStatement(0, *emptyExprList, 1); // Fake NLastStatement
                 $$ = new NBlock(*last);
                 $$->statements_add_list(*$1);
                 $$->statements_add_list(*$2); 
@@ -168,10 +168,11 @@ stat        : TK_KW_FOR identifier TK_OP_ASSIGN explist23 TK_KW_DO block TK_KW_E
             {
                 $$ = new NForLoopAssign(*$2, *$4, *$6);
             }
+            /* No es obligatorio
             | TK_KW_FOR namelist TK_KW_IN explist1 TK_KW_DO block TK_KW_END
             {
                 $$ = new NForLoopIn(*$2, *$4, *$6);
-            }
+            } */
             | TK_KW_IF conds TK_KW_END
             {
                 /* TODO: Complicado */

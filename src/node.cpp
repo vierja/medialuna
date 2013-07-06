@@ -7,6 +7,10 @@
 
 using namespace std;
 
+// AUX
+
+double expressionToDouble(NExpression* expr);
+
 NExpression* NBlock::runCode(CodeExecutionContext& context) {
     DEBUG_PRINT((MAGENTA"NBlock::runCode\n"RESET));
     DEBUG_PRINT((MAGENTA" - Size de statments: %i\n"RESET, (int)statements.size()));
@@ -51,15 +55,15 @@ NExpression* NMultiAssignment::runCode(CodeExecutionContext& context) {
         Si es local entonces hay que ver como tener prioridad ante el resto.
 
         IdentifierList idList;
-        ExpressionList expresionList;
+        ExpressionList expressionList;
         int isLocal;
     */
     IdentifierList::const_iterator id_it;
-    ExpressionList::const_iterator exp_it = expresionList.begin();
+    ExpressionList::const_iterator exp_it = expressionList.begin();
     for (id_it = idList.begin(); id_it != idList.end(); id_it++){
         string varName = (**id_it).name;
         NExpression* varExpression;
-        if (exp_it != expresionList.end()){
+        if (exp_it != expressionList.end()){
             // Si es una funcion entonces tengo que evaluarla.
             // y si es una variable tengo que obtener su valor.
             varExpression = (*exp_it)->evaluate(context);
@@ -69,7 +73,7 @@ NExpression* NMultiAssignment::runCode(CodeExecutionContext& context) {
         cout << "Se declara la variable " << varName << endl;
         context.addVariable(varName, varExpression, isLocal);
 
-        if (exp_it != expresionList.end()){
+        if (exp_it != expressionList.end()){
             exp_it++;
         }
     }
@@ -136,10 +140,165 @@ NExpression* NLastStatement::runCode(CodeExecutionContext& context) {
 }
 
 NExpression* NForLoopIn::runCode(CodeExecutionContext& context) {
-
+    /*
+        No es obligatorio, se deja para despues.
+    */
 }
 
 NExpression* NForLoopAssign::runCode(CodeExecutionContext& context) {
+    /*
+        NIdentifier& id;
+        ExpressionList expressionList;
+        NBlock& block;
+
+        id es la variable que se declara.
+        expressionList es de largo 2 o 3.
+        El primer valor determina el valor de id inicial.
+        El segundo valor es el limite.
+        Y en caso de no parar, si es que existe, se le suma el valor a la variable.
+    */
+    if (expressionList.size() < 2 || expressionList.size() > 3){
+        cout << "ERROR: Invalid parameters in for declaration\n";
+        exit(0);
+    }
+
+    // Las expressiones se evaluan en el contexto actual.
+    NExpression* firstExpr = expressionList[0]->evaluate(context);
+    NExpression* secondExpr = expressionList[1]->evaluate(context);
+    NExpression* thirdExpr;
+    int thirdExpressionDef = 0;
+    if (expressionList.size() == 3) {
+        thirdExpr = expressionList[2]->evaluate(context);
+        thirdExpressionDef = 1;
+    }
+
+    // Si alguna de las expresiones no son numeros entonces es un for invalido.
+    /*
+        TODO:
+            NO REPETIR TANTO CODIGO!!
+    */
+    double firstVal;
+    if (firstExpr->type() == STRING) {
+        // Primero tratamos a double.
+        istringstream ss((dynamic_cast<NString*>(firstExpr))->value);
+        if (!(ss >> firstVal)){
+            // No es double.
+            cout << "ERROR: 'for' initial value must be a number.\n";
+            exit(0);
+        }
+    } else if (firstExpr->type() == INTEGER) {
+        NInteger* intExpression = dynamic_cast<NInteger*>(firstExpr);
+        firstVal = (double) intExpression->value;
+    } else if (firstExpr->type() == DOUBLE) {
+        NDouble* doubExpression = dynamic_cast<NDouble*>(firstExpr);
+        firstVal = doubExpression->value;
+    } else {
+        cout << "ERROR: 'for' initial value must be a number.\n";
+        exit(0);
+    }
+    double secondVal;
+    if (secondExpr->type() == STRING) {
+        // Primero tratamos a double.
+        istringstream ss((dynamic_cast<NString*>(secondExpr))->value);
+        if (!(ss >> secondVal)){
+            // No es double.
+            cout << "ERROR: 'for' second value must be a number.\n";
+            exit(0);
+        }
+    } else if (secondExpr->type() == INTEGER) {
+        NInteger* intExpression = dynamic_cast<NInteger*>(secondExpr);
+        secondVal = (double) intExpression->value;
+    } else if (secondExpr->type() == DOUBLE) {
+        NDouble* doubExpression = dynamic_cast<NDouble*>(secondExpr);
+        secondVal = doubExpression->value;
+    } else {
+        cout << "ERROR: 'for' second value must be a number.\n";
+        exit(0);
+    }
+    double thirdVal;
+    if (thirdExpressionDef == 1){
+        try{
+            thirdVal = expressionToDouble(thirdExpr);
+        } catch (int e) {
+            cout << "ERROR: 'for' third value must be a number.\n";
+            exit(0);
+        }
+/*        if (thirdExpr->type() == STRING) {
+            // Primero tratamos a double.
+            istringstream ss((dynamic_cast<NString*>(thirdExpr))->value);
+            if (!(ss >> thirdVal)){
+                // No es double.
+                cout << "ERROR: 'for' third value must be a number.\n";
+                exit(0);
+            }
+        } else if (thirdExpr->type() == INTEGER) {
+            NInteger* intExpression = dynamic_cast<NInteger*>(thirdExpr);
+            thirdVal = (double) intExpression->value;
+        } else if (thirdExpr->type() == DOUBLE) {
+            NDouble* doubExpression = dynamic_cast<NDouble*>(thirdExpr);
+            thirdVal = doubExpression->value;
+        } else {
+            cout << "ERROR: 'for' third value must be a number.\n";
+            exit(0);
+        }*/
+    }
+    
+    CodeExecutionBlock* forBlock = new CodeExecutionBlock(block);
+    context.blocks.push_back(forBlock);
+
+    NDouble* firstExprDouble = new NDouble(firstVal);
+    context.addVariable(id.name, firstExprDouble, 1);
+
+    int blockReturned = 0;
+    int blockBreaked = 0;
+    int loopEndend = 0;
+    double varVal = firstVal;
+    int forCount = 0;
+    ExpressionList forReturnList;
+    while (1){
+
+        if (thirdExpressionDef == 1){
+            if ((thirdVal > 0 && varVal > secondVal) || (thirdVal < 0 && varVal <= secondVal)){
+                loopEndend = 1;
+                break;
+            }
+        }
+
+        DEBUG_PRINT((GREEN"Se ejecuta el bloque del for num: %d .\n"RESET, forCount));
+        NExpression* res = block.runCode(context);
+        DEBUG_PRINT((GREEN"Se termina de ejecutar bloque del for.\n"RESET));
+        if (res->type() != LAST_STATEMENT){
+            // No deberia de pasar nunca.
+            cout << "ERROR: For blocks returns invalid statement.\n";
+            exit(0);
+        }
+        NLastStatement* lastStatement = dynamic_cast<NLastStatement*>(res);
+        if (lastStatement->fake == 0) {
+            // Si es fake lo ignoramos, sino:
+            if (lastStatement->isBreak == 1) {
+                // Recibimos un break, entonces cortamos el for.
+                blockBreaked = 1;
+                break;
+            } else {
+                // Si no es break es return.
+                // Recibimos un return, entonces cortamos el for. 
+                blockReturned = 1;
+                forReturnList = lastStatement->returnList;
+                // TODO: Y termina el bloque superior.
+                break;
+            }
+        }
+
+        NExpression* firstExpr = context.getVariable(id.name);
+
+        //varVal = context.getVariable(id.name);
+        varVal = varVal + thirdVal;
+        firstExprDouble = new NDouble(firstVal);
+        context.addVariable(id.name, firstExprDouble, 1);
+
+
+    }
+
 
 }
 
@@ -787,4 +946,26 @@ NExpression* NBlock::evaluate(CodeExecutionContext& context){
 
 NExpression* NAnonFunctionDeclaration::evaluate(CodeExecutionContext& context){
     
+}
+
+double expressionToDouble(NExpression* expr){
+    double doubleVal;
+    if (expr->type() == STRING) {
+        // Primero tratamos a double.
+        istringstream ss((dynamic_cast<NString*>(expr))->value);
+        if (!(ss >> doubleVal)){
+            // No es double.
+            cout << "ERROR: 'for' third value must be a number.\n";
+            exit(0);
+        }
+    } else if (expr->type() == INTEGER) {
+        NInteger* intExpression = dynamic_cast<NInteger*>(expr);
+        doubleVal = (double) intExpression->value;
+    } else if (expr->type() == DOUBLE) {
+        NDouble* doubExpression = dynamic_cast<NDouble*>(expr);
+        doubleVal = doubExpression->value;
+    } else {
+        throw 1;
+    }
+    return doubleVal;
 }

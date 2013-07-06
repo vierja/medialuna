@@ -35,7 +35,7 @@
 
 enum NodeType {
     MULTI_ASSIGNMENT,
-    LAST_STATMENT,
+    LAST_STATEMENT,
     EXPRESSION_STATMENT,
     //MULTI_VARIABLE_DECLARATION,
     VARIABLE_DECLARATION,
@@ -254,17 +254,17 @@ public:
     A, B, C, D = "a", "b", "oops I took both c and d"
 
     idList = ["A", "B", "C", "D"]
-    expresionList = ["a", "b", "oops I took both C and D"]
+    expressionList = ["a", "b", "oops I took both C and D"]
 
-    Creo que idList.length() >= expresionList.length()
+    Creo que idList.length() >= expressionList.length()
 */
 class NMultiAssignment : public NStatement {
 public:
     IdentifierList idList;
-    ExpressionList expresionList;
+    ExpressionList expressionList;
     int isLocal;
-    NMultiAssignment(IdentifierList idList, ExpressionList expresionList, int isLocal) :
-        idList(idList), expresionList(expresionList), isLocal(isLocal) { }
+    NMultiAssignment(IdentifierList idList, ExpressionList expressionList, int isLocal) :
+        idList(idList), expressionList(expressionList), isLocal(isLocal) { }
     NodeType type(){ return MULTI_ASSIGNMENT; }
     std::string type_str(){ return "MULTI_ASSIGNMENT"; }
     NExpression* runCode(CodeExecutionContext& context);
@@ -274,11 +274,14 @@ class NLastStatement : public NStatement {
 public:
     ExpressionList returnList;
     int isBreak;
+    int fake; // Esta variable se usa para cuando se tiene un bloque que en realidad no tiene lastStatment.
 
     NLastStatement(int isBreak, ExpressionList& returnList):
-        isBreak(isBreak), returnList(returnList) { }
-    NodeType type(){ return LAST_STATMENT; }
-    std::string type_str(){ return "LAST_STATMENT"; }
+        isBreak(isBreak), returnList(returnList), fake(0) { }
+    NLastStatement(int isBreak, ExpressionList& returnList, int fake):
+        isBreak(isBreak), returnList(returnList), fake(fake) { }
+    NodeType type(){ return LAST_STATEMENT; }
+    std::string type_str(){ return "LAST_STATEMENT"; }
     NExpression* runCode(CodeExecutionContext& context);
 };
 
@@ -349,16 +352,16 @@ public:
     for key, value in pairs(t) do print(key, value) end
 
     nameList = ["key", "value"]
-    expresionList = ["pairs(t)"]
+    expressionList = ["pairs(t)"]
     body = '''print(key, value)'''
 */
 class NForLoopIn : public NStatement {
 public:
     IdentifierList nameList;
-    ExpressionList expresionList;
+    ExpressionList expressionList;
     NBlock& block;
-    NForLoopIn(IdentifierList nameList, ExpressionList expresionList, NBlock& block) :
-        nameList(nameList), expresionList(expresionList), block(block) { }
+    NForLoopIn(IdentifierList nameList, ExpressionList expressionList, NBlock& block) :
+        nameList(nameList), expressionList(expressionList), block(block) { }
     NodeType type(){ return FOR_LOOP_IN; }
     std::string type_str(){ return "FOR_LOOP_IN"; }
     NExpression* runCode(CodeExecutionContext& context);
@@ -370,18 +373,18 @@ public:
     for the_number = 1, MAXIMUM, STEP do print(the_number) end
 
     id = "the_number"
-    expresionList = ["1", "MAXIMUM", "STEP"]
+    expressionList = ["1", "MAXIMUM", "STEP"]
     body = ```print(the_number)```
 
-    expresionList es de largo 2 o 3.
+    expressionList es de largo 2 o 3.
 */
 class NForLoopAssign : public NStatement {
 public:
     NIdentifier& id;
-    ExpressionList expresionList;
+    ExpressionList expressionList;
     NBlock& block;
-    NForLoopAssign(NIdentifier& id, ExpressionList expresionList, NBlock& block) :
-        id(id), expresionList(expresionList), block(block) { }
+    NForLoopAssign(NIdentifier& id, ExpressionList expressionList, NBlock& block) :
+        id(id), expressionList(expressionList), block(block) { }
     NodeType type(){ return FOR_LOOP_ASSIGN; }
     std::string type_str(){ return "FOR_LOOP_ASSIGN"; }
     NExpression* runCode(CodeExecutionContext& context);
