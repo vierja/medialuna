@@ -131,6 +131,12 @@ scope       : { $$ = new StatementList();}
                 /* cualquiera de las dos listas pueden ser vacias. */
                 /* itero sobre statlist para agregar a scope. */
                 
+                StatementList::const_iterator it;
+                for (it = (*$2).begin(); it != (*$2).end(); it++){
+                    $1->push_back(*it);
+                }
+
+                $1->push_back($3);
                 //for(std::vector<stmt>::iterator it = $2->begin(); it != $2->end(); ++it) {
                 //    $1->push_back(it);
                 //}
@@ -139,8 +145,8 @@ scope       : { $$ = new StatementList();}
                 //    $1->push_back(it);
                 //}
                 /* Borro statlist y binding para no dejar memoria colgada. */
-                delete $2;
-                delete $3;
+                //delete $2;
+                //delete $3;
             }
             ;
 
@@ -231,7 +237,8 @@ laststat    : TK_KW_BREAK
 
 binding     : TK_KW_LOCAL namelist
             {
-                $$ = new NMultiVariableDeclaration(1, *$2);
+                ExpressionList* emptyExprList = new ExpressionList();
+                $$ = new NMultiAssignment(*$2, *emptyExprList, 1);
             }
             | TK_KW_LOCAL namelist TK_OP_ASSIGN explist1
             {
@@ -239,11 +246,11 @@ binding     : TK_KW_LOCAL namelist
                     namelist es IdentifierList
                     explist1 es ExpressionList
                 */
+                std::cout << "NMultiAssignment(" << $2 << "," << $4 << ");" << std::endl;
                 $$ = new NMultiAssignment(*$2, *$4, 1);
                 /* el 1 es porque es ```local``` */
                 /* Borro las listas generadas */
-                delete $2;
-                delete $4;
+
             }
             ;
 
@@ -481,24 +488,20 @@ functioncal :
             }
             | identifier TK_OP_DOT identifier TK_OP_OPEN_PAREN TK_OP_CLOS_PAREN
             {
-                std::string first = $1->name;
-                std::string secon = $3->name;
-                first.append(".");
-                first.append(secon);
-                NIdentifier* realid = new NIdentifier(first);
+                std::string* idenStr = new std::string($1->name + "." + $3->name); 
+                NIdentifier* realid = new NIdentifier(*idenStr);
                 ExpressionList* arguments = new ExpressionList();
                 $$ = new NFunctionCall(*realid, *arguments);
                 /* TODO: Falta deletes */
             }
             | identifier TK_OP_DOT identifier TK_OP_OPEN_PAREN explist1 TK_OP_CLOS_PAREN
             {
-                std::string first = $1->name;
-                std::string secon = $3->name;
-                first.append(".");
-                first.append(secon);
-                NIdentifier* realid = new NIdentifier(first);
+                std::string* idenStr = new std::string($1->name + "." + $3->name);
+                NIdentifier* realid = new NIdentifier(*idenStr);
                 $$ = new NFunctionCall(*realid, *$5);
+                //std::cout << ((NExpression*)$$)->id.name << std::endl;
                 /* TODO: Falta deletes */
+                delete idenStr;
             }
             /* FIN SIMPLIFICACION */
             | prefixexp TK_OP_COLON identifier args

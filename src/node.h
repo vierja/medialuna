@@ -10,11 +10,23 @@ enum NodeType {
     MULTI_ASSIGNMENT,
     LAST_STATMENT,
     EXPRESSION_STATMENT,
-    MULTI_VARIABLE_DECLARATION,
+    //MULTI_VARIABLE_DECLARATION,
     VARIABLE_DECLARATION,
     FOR_LOOP_IN,
     FOR_LOOP_ASSIGN,
-    FUNCTION_DECLARATION
+    FUNCTION_DECLARATION,
+    NIL,
+    BOOLEAN,
+    INTEGER,
+    DOUBLE,
+    STRING,
+    IDENTIFIER,
+    FUNCTION_CALL,
+    BINARY_OPERATOR,
+    UNARY_OPERATOR,
+    BLOCK,
+    ANON_FUNCTION_DECLARATION,
+    EXPRESSION
 };
 
 class CodeExecutionContext;
@@ -34,6 +46,9 @@ public:
 };
 
 class NExpression : public Node {
+public:
+    virtual NodeType type() { return EXPRESSION; };
+    virtual NExpression* evaluate(CodeExecutionContext& context) = 0;
 };
 
 class NStatement : public Node {
@@ -41,6 +56,39 @@ public:
     virtual NodeType type() = 0;
     virtual void runCode(CodeExecutionContext& context) = 0;
 };
+
+/*
+    TODO: Ignorar hasta demostrar que se puede usar un subset de NExpression como valor de retorno.
+    Valor de retorno de una funcion, no se usa en el parsing
+    pero si se utiliza en la ejecucion del codigo.
+/*
+/*
+
+class NReturnValue : public Node {
+
+};
+
+/*
+    No retorna nada.
+
+class NReturnNil : public NReturnValue {
+public:
+    NReturnValue(){}
+};
+
+class NReturnBoolean : public NReturnValue {
+public:
+    int trueVal;
+    NReturnValue(int trueVal): trueVal(trueVal) { }
+};
+class NReturnInteger : public NReturnValue {
+public:
+
+};
+
+*/
+
+
 
 /*
     Valor Nil.
@@ -51,6 +99,8 @@ public:
 class NNil : public NExpression {
 public:
     NNil() { }
+    NodeType type(){ return NIL; }
+    NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
 /*
@@ -62,30 +112,40 @@ class NBoolean : public NExpression {
 public:
     int trueVal;
     NBoolean(int trueVal) : trueVal(trueVal) { }
+    NodeType type(){ return BOOLEAN; }
+    NExpression* evaluate(CodeExecutionContext& context){ return this; }
 };
 
 class NInteger : public NExpression {
 public:
     long long value;
     NInteger(long long value) : value(value) { }
+    NodeType type(){ return INTEGER; }
+    NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
 class NDouble : public NExpression {
 public:
     double value;
     NDouble(double value) : value(value) { }
+    NodeType type(){ return DOUBLE; }
+    NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
 class NString : public NExpression {
 public:
     std::string value;
     NString(const std::string& value) : value(value) { }
+    NodeType type(){ return STRING; }
+    NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
 class NIdentifier : public NExpression {
 public:
     std::string name;
     NIdentifier(const std::string& name) : name(name) { }
+    NodeType type(){ return IDENTIFIER; }
+    NExpression* evaluate(CodeExecutionContext& context);
 };
 
 /*
@@ -109,11 +169,13 @@ public:
 
 class NFunctionCall : public NExpression {
 public:
-    const NIdentifier& id;
+    NIdentifier& id;
     ExpressionList arguments;
-    NFunctionCall(const NIdentifier& id, ExpressionList& arguments) :
+    NFunctionCall(NIdentifier& id, ExpressionList& arguments) :
         id(id), arguments(arguments) { }
-    NFunctionCall(const NIdentifier& id) : id(id) { }
+    NFunctionCall(NIdentifier& id) : id(id) { }
+    NodeType type(){ return FUNCTION_CALL; }
+    NExpression* evaluate(CodeExecutionContext& context);
 };
 
 class NBinaryOperator : public NExpression {
@@ -123,6 +185,8 @@ public:
     NExpression& rhs;
     NBinaryOperator(int op, NExpression& lhs, NExpression& rhs) :
         op(op), lhs(lhs), rhs(rhs) { }
+    NodeType type(){ return BINARY_OPERATOR; }
+    NExpression* evaluate(CodeExecutionContext& context);
 };
 
 class NUnaryOperator : public NExpression {
@@ -131,6 +195,8 @@ public:
     NExpression& rhs;
     NUnaryOperator(NExpression& rhs, int op) :
         rhs(rhs), op(op) { }
+    NodeType type(){ return UNARY_OPERATOR; }
+    NExpression* evaluate(CodeExecutionContext& context);
 };
 
 /*
@@ -185,6 +251,8 @@ public:
     };
 
     void runCode(CodeExecutionContext& context);
+    NodeType type(){ return BLOCK; }
+    NExpression* evaluate(CodeExecutionContext& context);
 };
 
 class NExpressionStatement : public NStatement {
@@ -197,7 +265,7 @@ public:
     void runCode(CodeExecutionContext& context);
 };
 
-class NMultiVariableDeclaration : public NStatement {
+/*class NMultiVariableDeclaration : public NStatement {
 public:
     IdentifierList idList;
     int isLocal;
@@ -206,7 +274,7 @@ public:
     NodeType type(){ return MULTI_VARIABLE_DECLARATION; }
     void runCode(CodeExecutionContext& context);
 
-};
+};*/
 
 class NVariableDeclaration : public NStatement {
 public:
@@ -277,6 +345,8 @@ public:
     NBlock& block;
     NAnonFunctionDeclaration(IdentifierList& arguments, NBlock& block) :
         arguments(arguments), block(block) { }
+    NodeType type(){ return ANON_FUNCTION_DECLARATION; }
+    NExpression* evaluate(CodeExecutionContext& context);
 };
 
 /*

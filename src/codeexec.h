@@ -26,14 +26,13 @@ public:
     pone local entonces si no existe ya es igual a una local.
     */
     map<string, NExpression*> variables;
-    map<string, NExpression*> localVariables;
     map<string, NFunctionDeclaration*> functions;
-    map<string, NFunctionDeclaration*> localFunctions;
 };
 
 class CodeExecutionContext {
 public:
-    std::stack<CodeExecutionBlock*> blocks;
+    // La lista de blocks funciona como un stack, pero permite facilmente recorrerla.
+    vector<CodeExecutionBlock*> blocks;
 
     /**
      * executeCode toma como parametro un NBlock y ejecuta el codigo.
@@ -43,6 +42,49 @@ public:
      * el stack se encuentra vacio.
     */
     void* executeCode(NBlock& root); // Puede devolver cualquier cosa.
+
+    /*
+        Devuelve la variable con el nombre `name` en el contexto.
+        Empieza a buscar desde el ultimo al primero.
+    */
+    NExpression* getVariable(string name);
+
+    /*
+    *   Agrega o sobreescribe la funcion de nombre `name` al contexto.
+    *   Se guarda en el mapa `functions` del ultimo bloque.
+    */
+    void addFunction(string name, NFunctionDeclaration* function);
+
+    /*
+        Agrega o sobreescribe la variable de nombre `name` al contexto.
+        Si la variable es local (`isLocal` == 1) entonces se guarda
+        en el ultimo bloque.
+        Si no es local (`isLocal` == 0) entonces se busca en el contexto
+        y se sobreescribe. Si no se encuentra se agrega en el ultimo bloque.
+    */
+    void addVariable(string name, NExpression* expression, int isLocal);
+
+    /*
+        Chequea si una funcion de nombre `name` se encuentra definida en el contexto.
+    */
+    int functionDefined(string name);
+
+    /*
+        Analogo al `print` de Lua.
+    */
+    void print(ExpressionList exprList);
+
+    /*
+        Aux al `print` de Lua. Imprime una expression.
+    */
+    void print_expr(NExpression* expr);
+
+    /*
+        Para debuggear.
+        Imprime las variables y funciones del contexto recorriendo los bloques
+        del ultimo hacia el primero.
+    */
+    void printFunctionsAndVariables();
 };
 
 #endif
