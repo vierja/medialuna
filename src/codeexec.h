@@ -50,6 +50,13 @@ public:
     NExpression* getVariable(string name);
 
     /*
+        Devuelve la funcion (NFunctionDeclaration) con el nombre `name`
+        en el contexto.
+        Empieza a buscar desde el ultimo al primero.
+    */
+    NFunctionDeclaration* getFunction(string name);
+
+    /*
     *   Agrega o sobreescribe la funcion de nombre `name` al contexto.
     *   Se guarda en el mapa `functions` del ultimo bloque.
     */

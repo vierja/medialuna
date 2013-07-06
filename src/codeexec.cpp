@@ -36,6 +36,18 @@ NExpression* CodeExecutionContext::getVariable(string name){
     }
 };
 
+NFunctionDeclaration* CodeExecutionContext::getFunction(string name){
+    vector<CodeExecutionBlock*>::reverse_iterator it;
+    map<string, NFunctionDeclaration*>::iterator func_it;
+    for (it = blocks.rbegin(); it != blocks.rend(); ++it){
+        // Busco si la funcion de nombre `name` esta definida en el mapa de funciones.
+        func_it = (**it).functions.find(name);
+        if (func_it != (**it).functions.end()){
+            return func_it->second;
+        }
+    }
+}
+
 void CodeExecutionContext::addFunction(string name, NFunctionDeclaration* function){
     // Obtengo el bloque actual de ejecucion.
     /*
@@ -87,14 +99,31 @@ int CodeExecutionContext::functionDefined(string name){
 
 void CodeExecutionContext::print(ExpressionList exprList){
     cout << "FUNCION PRINT ->\n";
-
-    ExpressionList::const_iterator exp_it;
-    ExpressionList::const_iterator final_it = exprList.end();
-    --final_it;
     DEBUG_PRINT((GREEN"Se tienen %d expressions para imprimir\n"RESET, (int) exprList.size()));
+    ExpressionList* exprListFinal = new ExpressionList();
+
+    // Creo una nueva ExpressionList con las expressiones evaluadas (si es necesario).
+    ExpressionList::const_iterator exp_it;
     for (exp_it = exprList.begin(); exp_it != exprList.end(); exp_it++){
+        NExpression* evaluatedExpression = (*exp_it)->evaluate(*this);
+        exprListFinal->push_back(evaluatedExpression);
+    }
+
+    // Si solo se tiene una expression para imprimir
+    // y esta es NExpressionList, imprimo cada una de esas.
+    // si una de varias expressiones es NExpressionList entonces imprimo normal y uso la primera.
+    if (exprListFinal->size() == 1){
+        if (exprListFinal->front()->type() == EXPRESSION_LIST){
+            NExpressionList* nExprList = dynamic_cast<NExpressionList*>(exprListFinal->front());
+            exprListFinal = &nExprList->exprList;
+        }
+    }
+
+    ExpressionList::const_iterator final_it = exprListFinal->end();
+    --final_it;
+
+    for (exp_it = exprListFinal->begin(); exp_it != exprListFinal->end(); exp_it++){
         this->print_expr((*exp_it));
-        // TODO: Si no es la ultima, imprimo 1 tab.
         if (exp_it != final_it){
             cout << "\t";
         }
@@ -136,8 +165,10 @@ void CodeExecutionContext::print_expr(NExpression* expr){
                 }
             }
             break;
-        case FUNCTION_CALL:
-            cout << "FUNCTION_CALL -> NOT IMPLEMENTED" << endl;
+        case FUNCTION_CALL: {
+                NFunctionCall* funcCall = dynamic_cast<NFunctionCall*>(expr);
+                this->print_expr(funcCall->evaluate(*this));
+            }
             break;
         case BINARY_OPERATOR: {
                 DEBUG_PRINT((YELLOW"Se va a imprimir una expresion binaria\n"RESET));
@@ -158,6 +189,12 @@ void CodeExecutionContext::print_expr(NExpression* expr){
             break;
         case ANON_FUNCTION_DECLARATION:
             cout << "ANON_FUNCTION_DECLARATION -> NOT IMPLEMENTED" << endl;
+            break;
+        case EXPRESSION_LIST: {
+                // TODO: Imprimir dependiendo de como se llama la funcion.
+                NExpressionList* exprList = dynamic_cast<NExpressionList*>(expr);
+                this->print_expr(exprList->exprList[0]);
+            }
             break;
         default:
             cout << "PRINT DEFAULT ERROR!!" << endl;

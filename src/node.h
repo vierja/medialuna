@@ -48,6 +48,7 @@ enum NodeType {
     DOUBLE,
     STRING,
     IDENTIFIER,
+    EXPRESSION_LIST,
     FUNCTION_CALL,
     BINARY_OPERATOR,
     UNARY_OPERATOR,
@@ -82,7 +83,7 @@ public:
 class NStatement : public Node {
 public:
     virtual NodeType type() = 0;
-    virtual void runCode(CodeExecutionContext& context) = 0;
+    virtual NExpression* runCode(CodeExecutionContext& context) = 0;
     virtual std::string type_str() = 0;
 };
 
@@ -183,6 +184,16 @@ public:
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
+class NExpressionList : public NExpression {
+public:
+    ExpressionList exprList;
+    NExpressionList(ExpressionList& exprList):
+        exprList(exprList) { }
+    NodeType type(){ return EXPRESSION_LIST; }
+    std::string type_str(){ return "EXPRESSION_LIST"; }
+    NExpression* evaluate(CodeExecutionContext& context);
+};
+
 /*
     TODO:
     Esto en verdad teoricamente puede recibir una lista
@@ -256,7 +267,7 @@ public:
         idList(idList), expresionList(expresionList), isLocal(isLocal) { }
     NodeType type(){ return MULTI_ASSIGNMENT; }
     std::string type_str(){ return "MULTI_ASSIGNMENT"; }
-    void runCode(CodeExecutionContext& context);
+    NExpression* runCode(CodeExecutionContext& context);
 };
 
 class NLastStatement : public NStatement {
@@ -268,7 +279,7 @@ public:
         isBreak(isBreak), returnList(returnList) { }
     NodeType type(){ return LAST_STATMENT; }
     std::string type_str(){ return "LAST_STATMENT"; }
-    void runCode(CodeExecutionContext& context);
+    NExpression* runCode(CodeExecutionContext& context);
 };
 
 /*
@@ -290,7 +301,7 @@ public:
         }
     };
 
-    void runCode(CodeExecutionContext& context);
+    NExpression* runCode(CodeExecutionContext& context);
     NodeType type(){ return BLOCK; }
     std::string type_str(){ return "BLOCK"; }
     NExpression* evaluate(CodeExecutionContext& context);
@@ -304,7 +315,7 @@ public:
     NodeType type(){ return EXPRESSION_STATMENT; }
     std::string type_str(){ return "EXPRESSION_STATMENT"; }
 
-    void runCode(CodeExecutionContext& context);
+    NExpression* runCode(CodeExecutionContext& context);
 };
 
 /*class NMultiVariableDeclaration : public NStatement {
@@ -315,7 +326,7 @@ public:
         isLocal(isLocal), idList(idList) { }
     NodeType type(){ return MULTI_VARIABLE_DECLARATION; }
     std::string type_str(){ return "MULTI_VARIABLE_DECLARATION"; }
-    void runCode(CodeExecutionContext& context);
+    NExpression* runCode(CodeExecutionContext& context);
 
 };*/
 
@@ -329,7 +340,7 @@ public:
         id(id), assignmentExpr(assignmentExpr) { }
     NodeType type(){ return VARIABLE_DECLARATION; }
     std::string type_str(){ return "VARIABLE_DECLARATION"; }
-    void runCode(CodeExecutionContext& context);
+    NExpression* runCode(CodeExecutionContext& context);
 };
 
 /*
@@ -350,7 +361,7 @@ public:
         nameList(nameList), expresionList(expresionList), block(block) { }
     NodeType type(){ return FOR_LOOP_IN; }
     std::string type_str(){ return "FOR_LOOP_IN"; }
-    void runCode(CodeExecutionContext& context);
+    NExpression* runCode(CodeExecutionContext& context);
 }; 
 
 /*
@@ -373,7 +384,7 @@ public:
         id(id), expresionList(expresionList), block(block) { }
     NodeType type(){ return FOR_LOOP_ASSIGN; }
     std::string type_str(){ return "FOR_LOOP_ASSIGN"; }
-    void runCode(CodeExecutionContext& context);
+    NExpression* runCode(CodeExecutionContext& context);
 };
 
 
@@ -414,7 +425,7 @@ public:
         id(id), arguments(arguments), block(block) { }
     NodeType type(){ return FUNCTION_DECLARATION; }
     std::string type_str(){ return "FUNCTION_DECLARATION"; }
-    void runCode(CodeExecutionContext& context);
+    NExpression* runCode(CodeExecutionContext& context);
 };
 
 #endif NODE_H

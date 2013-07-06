@@ -7,24 +7,27 @@
 
 using namespace std;
 
-void NBlock::runCode(CodeExecutionContext& context) {
-    DEBUG_PRINT((RED"NBlock::runCode\n"RESET));
-    DEBUG_PRINT((GREEN" - Size de statments: %i\n"RESET, (int)statements.size()));
+NExpression* NBlock::runCode(CodeExecutionContext& context) {
+    DEBUG_PRINT((MAGENTA"NBlock::runCode\n"RESET));
+    DEBUG_PRINT((MAGENTA" - Size de statments: %i\n"RESET, (int)statements.size()));
     StatementList::const_iterator it;
+    int count = 0;
 
     for (it = statements.begin(); it != statements.end(); it++){
-        cout << "Running code for ";
-        cout << typeid(**it).name() << endl;
+        DEBUG_PRINT((MAGENTA"   ** Se corre el statement numero %d, tipo: %s\n"RESET, count, typeid(**it).name()));
+        
         (**it).runCode(context);
-        cout << "Corrido\n";
+        
+        DEBUG_PRINT((MAGENTA"   ** Fin del statement numero %d\n"RESET, count++));
     }
-    cout << "Se termina de agregar los statemtents";
+    DEBUG_PRINT((BLUE"Se imprimen variables y funciones:\n"RESET));
     context.printFunctionsAndVariables();
-    
+    DEBUG_PRINT((BLUE"Se terminan de imprimir variables\n"RESET));
+
     return lastStatement.runCode(context);
 }
 
-void NFunctionDeclaration::runCode(CodeExecutionContext& context) {
+NExpression* NFunctionDeclaration::runCode(CodeExecutionContext& context) {
     /*
         Cuando se declara una funcion no se corre, pero se debe guardar 
         en el contexto.
@@ -35,12 +38,13 @@ void NFunctionDeclaration::runCode(CodeExecutionContext& context) {
         NBlock& block;
     */
     string funcName = id.name;
-    cout << "Se declara la funcion " << funcName << endl;
     context.addFunction(funcName, this);
-    cout << "agregada al contexto" << endl;
+    
+    // No devuelve nada.
+
 }
 
-void NMultiAssignment::runCode(CodeExecutionContext& context) {
+NExpression* NMultiAssignment::runCode(CodeExecutionContext& context) {
     /*
         Cuando se tiene multi assignment hay varias cosas para tener
         en cuenta.
@@ -71,12 +75,15 @@ void NMultiAssignment::runCode(CodeExecutionContext& context) {
     }
 }
 
-void NExpressionStatement::runCode(CodeExecutionContext& context) {
+NExpression* NExpressionStatement::runCode(CodeExecutionContext& context) {
     /*
+
+        NExpression& expression;
+
+
         Cuando se tiene un expression statment lo unico que importa
         es si es es NFunctionCall, en ese caso se llama a la funcion.
     */
-    /* TODO: Esto deberia de arreglarse en el parser. */
     if (expression.type() != FUNCTION_CALL){
         cout << "ERROR: Unexpected expression.\n";
         exit(1);
@@ -85,31 +92,75 @@ void NExpressionStatement::runCode(CodeExecutionContext& context) {
     NFunctionCall* functionCall = dynamic_cast<NFunctionCall*>(&expression);
     string funcName = functionCall->id.name;
 
+    string tablePrefix = "table.";
+
     if (funcName.compare("print") == 0){
         context.print(functionCall->arguments);
+        NNil* nilReturn = new NNil;
+        return nilReturn;
+    } else if (funcName.substr(0, tablePrefix.size()).compare(tablePrefix) == 0){
+        cout << "ERROR: Operaciones `table` todavia no estan implementadas.\n";
+        NNil* nilReturn = new NNil;
+        return nilReturn;
+    } else {
+        // Si no es ni print ni operacion table entonces devolvemos la evaluacion.
+        return functionCall->evaluate(context);
+    }
+}
+
+NExpression* NLastStatement::runCode(CodeExecutionContext& context) {
+    /*
+        NLastStatement
+        Puede ser un break o un return.
+        En caso de ser return tiene una ExpressionList (returnList)
+    */
+    if (isBreak || returnList.size() == 0){
+        NNil* nilRes = new NNil();
+        return nilRes;
+    } else if (returnList.size() == 1) {
+        NExpression* onlyExpr = returnList[0];
+        return onlyExpr->evaluate(context);
+    } else {
+        // Sino, tengo que evaluar de ExpressionList.
+        ExpressionList* evalExpList = new ExpressionList();
+        ExpressionList::const_iterator it;
+
+        for (it = returnList.begin(); it != returnList.end(); it++){
+            evalExpList->push_back((**it).evaluate(context));
+        }
+
+        NExpressionList* evalNExpr = new NExpressionList(*evalExpList);
+        return evalNExpr;
     }
 
+}
+
+NExpression* NForLoopIn::runCode(CodeExecutionContext& context) {
 
 }
 
-
-void NLastStatement::runCode(CodeExecutionContext& context) {
-
-}
-
-void NForLoopIn::runCode(CodeExecutionContext& context) {
-
-}
-
-void NForLoopAssign::runCode(CodeExecutionContext& context) {
+NExpression* NForLoopAssign::runCode(CodeExecutionContext& context) {
 
 }
 
 /*
-void NMultiVariableDeclaration::runCode(CodeExecutionContext& context) {
+NExpression* NMultiVariableDeclaration::runCode(CodeExecutionContext& context) {
 
 }
 */
+
+NExpression* NExpressionList::evaluate(CodeExecutionContext& context) {
+    ExpressionList* evalExpList = new ExpressionList();
+    ExpressionList::const_iterator it;
+
+    for (it = exprList.begin(); it != exprList.end(); it++){
+        evalExpList->push_back((**it).evaluate(context));
+    }
+
+    NExpressionList* evalNExpr = new NExpressionList(*evalExpList);
+    return evalNExpr;
+
+}
 
 NExpression* NIdentifier::evaluate(CodeExecutionContext& context){
     //Busco el valor de la variable en el contexto.
@@ -120,6 +171,73 @@ NExpression* NIdentifier::evaluate(CodeExecutionContext& context){
 
 NExpression* NFunctionCall::evaluate(CodeExecutionContext& context){
     cout << "NFunctionCall::evaluate\n";
+    /*
+        Una funcionCall consiste de:
+        NIdentifier& id;
+        ExpressionList arguments;
+
+        La idea es buscar la funcion `id` en el contexto, 
+        evaluar (si es necesario) las expressiones en los argumentos.
+        Mapear cada argumento a los definidos en la lista de identificadores
+        de la Function.
+        Crear un CodeExecutionBlock, guardar las variables 
+        en el CodeExecutionBlock.
+        Agregarlo al stack
+        y hacer runCode de el block de la funcion.
+        Esto devuelve una Expression (o mas bien ExpressionList)
+        la cual se devuelve.
+    */
+
+    NFunctionDeclaration* funcDecl = context.getFunction(id.name);
+
+    if (funcDecl == 0){
+        // No existe funcion, error.
+        cout << "ERROR: Invalid function name " << id.name << endl;
+        exit(0);
+    }
+
+    CodeExecutionBlock* funcBlock = new CodeExecutionBlock(funcDecl->block);
+    context.blocks.push_back(funcBlock);
+
+    // Tengo que mapear los arguments (NExpression) en this->arguments
+    // con los de funcDecl->arguments (NIdentifier).
+
+    // Si se reciben menos argumentos que los declarados, estos se pasan como nil
+    // Si se reciben mas argumentos que los declarados, estos son ignorados.
+    // Todos las variables que se agreguen se hace como locales.
+
+    int var_count = 0;
+    IdentifierList::const_iterator id_it;
+    ExpressionList::const_iterator exp_it = arguments.begin();
+    for (id_it = funcDecl->arguments.begin(); id_it != funcDecl->arguments.end(); id_it++){
+        var_count++;
+        string varName = (**id_it).name;
+        NExpression* varExpression;
+        if (exp_it != arguments.end()){
+            // Si es una funcion entonces tengo que evaluarla.
+            // y si es una variable tengo que obtener su valor.
+            varExpression = (*exp_it)->evaluate(context);
+        } else {
+            varExpression = new NNil();
+        }
+        // Se agrega la variable al contexto como local.
+        context.addVariable(varName, varExpression, 1);
+
+        if (exp_it != arguments.end()){
+            exp_it++;
+        }
+    }
+
+    // Con las variables y el bloque en el contexto. Corro el bloque.
+    DEBUG_PRINT((GREEN"Se cargan %d variables, se ejecuta el bloque.\n"RESET, var_count));
+    NExpression* res = funcDecl->block.runCode(context);
+    DEBUG_PRINT((GREEN"Se termina de ejecutar bloque.\n"RESET));
+    res = res->evaluate(context);
+
+    // Quito el bloque de la funcion del contexto.
+    context.blocks.pop_back();
+
+    return res;
 }
 
 NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
@@ -217,6 +335,14 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             DEBUG_PRINT((YELLOW" - lhs no es de tipo dinamico (%s). No se evalua.\n"RESET, lhs.type_str().c_str()));
             lEvalExpression = &lhs;
         }
+
+        /*//* Si es un NExpressionList entonces solo se usa el primero.
+        if (rtype == EXPRESSION_LIST) {
+            NExpressionList* nExprList = dynamic_cast<NExpressionList*>(&lhs);
+            rEvalExpression = nExprList->exprList[0];
+            rtype = rEvalExpression->type();
+        }*
+
         if (rtype == IDENTIFIER || rtype == FUNCTION_CALL || rtype == BINARY_OPERATOR || rtype == UNARY_OPERATOR || rtype == BLOCK || rtype == ANON_FUNCTION_DECLARATION){
             DEBUG_PRINT((YELLOW" - rhs es de tipo %s. Se evalua.\n"RESET, rhs.type_str().c_str()));
             rEvalExpression = rhs.evaluate(context);
@@ -376,6 +502,7 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
         NExpression* lEvalExpression;
         NExpression* rEvalExpression;
 
+
         if (ltype == IDENTIFIER || ltype == FUNCTION_CALL || ltype == BINARY_OPERATOR || ltype == UNARY_OPERATOR || ltype == BLOCK || ltype == ANON_FUNCTION_DECLARATION){
             DEBUG_PRINT((YELLOW" - lhs es de tipo %s. Se evalua.\n"RESET, lhs.type_str().c_str()));
             lEvalExpression = lhs.evaluate(context);
@@ -385,6 +512,7 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             DEBUG_PRINT((YELLOW" - lhs no es de tipo dinamico (%s). No se evalua.\n"RESET, lhs.type_str().c_str()));
             lEvalExpression = &lhs;
         }
+
         if (rtype == IDENTIFIER || rtype == FUNCTION_CALL || rtype == BINARY_OPERATOR || rtype == UNARY_OPERATOR || rtype == BLOCK || rtype == ANON_FUNCTION_DECLARATION){
             DEBUG_PRINT((YELLOW" - rhs es de tipo %s. Se evalua.\n"RESET, rhs.type_str().c_str()));
             rEvalExpression = rhs.evaluate(context);
@@ -453,6 +581,7 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             DEBUG_PRINT((YELLOW" - lhs no es de tipo dinamico (%s). No se evalua.\n"RESET, lhs.type_str().c_str()));
             lEvalExpression = &lhs;
         }
+
         if (rtype == IDENTIFIER || rtype == FUNCTION_CALL || rtype == BINARY_OPERATOR || rtype == UNARY_OPERATOR || rtype == BLOCK || rtype == ANON_FUNCTION_DECLARATION){
             DEBUG_PRINT((YELLOW" - rhs es de tipo %s. Se evalua.\n"RESET, rhs.type_str().c_str()));
             rEvalExpression = rhs.evaluate(context);
