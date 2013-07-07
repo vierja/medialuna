@@ -949,9 +949,11 @@ NExpression* NUnaryOperator::evaluate(CodeExecutionContext& context){
                 cout << "ERROR: Invalid string value for unary '-'.\n";
                 exit(0);
             }
+            rDoubleValue = -rDoubleValue;
         } else if (rtype == DOUBLE) {
             // Si left es double entonces right lo va a ser tambien (por que int int ya termino.)
             rDoubleValue = (dynamic_cast<NDouble*>(rEvalExpression))->value;
+            rDoubleValue = -rDoubleValue;
             DEBUG_PRINT((GREEN" - Se obtiene el res del double: %f\n"RESET, rDoubleValue));
         }
 

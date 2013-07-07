@@ -162,6 +162,7 @@ void CodeExecutionContext::print_expr(NExpression* expr){
             cout << (dynamic_cast<NInteger*>(expr))->value;
             break;
         case DOUBLE:
+            cout.precision(14);
             cout << (dynamic_cast<NDouble*>(expr))->value;
             break;
         case STRING: {
