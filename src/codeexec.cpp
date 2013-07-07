@@ -27,7 +27,7 @@ void* CodeExecutionContext::executeCode(NBlock& root){
 }
 
 void CodeExecutionContext::push_block(CodeExecutionBlock* ceb){
-    this->blocks.push_block(ceb);
+    this->blocks.push_back(ceb);
 }
 void CodeExecutionContext::pop_block(){
     this->blocks.pop_back();

@@ -17,19 +17,27 @@ NExpression* NBlock::runCode(CodeExecutionContext& context) {
     DEBUG_PRINT((MAGENTA" - Size de statments: %i\n"RESET, (int)statements.size()));
     StatementList::const_iterator it;
     int count = 0;
+    NExpression* statmentRes;
 
     for (it = statements.begin(); it != statements.end(); it++){
         DEBUG_PRINT((MAGENTA"   ** Se corre el statement numero %d, tipo: %s\n"RESET, count, typeid(**it).name()));
-        
-        (**it).runCode(context);
-        
+        statmentRes = (**it).runCode(context);
+        if (statmentRes != 0){
+            DEBUG_PRINT((MAGENTA"   ** Statement numero %d devuelve valor no null, tipo: %s.\n"RESET, count++, statmentRes->type_str().c_str()));
+            if (statmentRes->type() != NIL){
+                return statmentRes;
+            }
+        }
         DEBUG_PRINT((MAGENTA"   ** Fin del statement numero %d\n"RESET, count++));
     }
     DEBUG_PRINT((BLUE"Se imprimen variables y funciones:\n"RESET));
     context.printFunctionsAndVariables();
     DEBUG_PRINT((BLUE"Se terminan de imprimir variables\n"RESET));
 
-    return lastStatement.runCode(context);
+    DEBUG_PRINT((BLUE"Se terminan los statements y se ejecuta lastStatement de tipo: %s\n"RESET, lastStatement.type_str().c_str()));
+    NExpression* resultExpr = lastStatement.runCode(context);
+    DEBUG_PRINT((BLUE"Se evalua y el res es de tipo: %s\n"RESET, resultExpr->type_str().c_str()));
+    return resultExpr;
 }
 
 NExpression* NFunctionDeclaration::runCode(CodeExecutionContext& context) {
@@ -46,6 +54,7 @@ NExpression* NFunctionDeclaration::runCode(CodeExecutionContext& context) {
     context.addFunction(funcName, this);
     
     // No devuelve nada.
+    return new NNil();
 
 }
 
@@ -66,10 +75,13 @@ NExpression* NMultiAssignment::runCode(CodeExecutionContext& context) {
         string varName = (**id_it).name;
         NExpression* varExpression;
         if (exp_it != expressionList.end()){
+            DEBUG_PRINT((RED"Variable con expression de tipo %s. Se evalua.\n"RESET, (*exp_it)->type_str().c_str()));
             // Si es una funcion entonces tengo que evaluarla.
             // y si es una variable tengo que obtener su valor.
             varExpression = (*exp_it)->evaluate(context);
+            DEBUG_PRINT((RED"La expression devuelve tipo: %s.\n"RESET, varExpression->type_str().c_str()));
         } else {
+            DEBUG_PRINT((RED"Variable sin expression. Se setea como null."RESET));
             varExpression = new NNil();
         }
         cout << "Se declara la variable " << varName << endl;
@@ -80,6 +92,7 @@ NExpression* NMultiAssignment::runCode(CodeExecutionContext& context) {
             exp_it++;
         }
     }
+    return new NNil();
 }
 
 NExpression* NIfCond::runCode(CodeExecutionContext& context) {
@@ -100,7 +113,7 @@ NExpression* NIf::runCode(CodeExecutionContext& context) {
     int cond_count = 0;
     DEBUG_PRINT((RED"NIf::runCode\n"RESET));
     ConditionList::const_iterator cond_it;
-    NExpression* returnExpr;
+    NExpression* returnExpr = new NNil();
 
     for (cond_it = conditions.begin(); cond_it != conditions.end(); cond_it++) {
         // Calculo el valor booleano de la expression del if en la condicion.
@@ -108,11 +121,11 @@ NExpression* NIf::runCode(CodeExecutionContext& context) {
         if (boolValue == 1) {
             // Entramos al if. Corremos el codigo, y termina.
             CodeExecutionBlock* ifBlock = new CodeExecutionBlock((**cond_it).block);
-            context.blocks.push_back(ifBlock);
-            DEBUG_PRINT((GREEN"Se ejecuta el bloque del for num: %d .\n"RESET, cond_count));
-            NExpression* returnExpr = (**cond_it).block.runCode(context);
-            DEBUG_PRINT((GREEN"Se termina de ejecutar bloque del for.\n"RESET));
-            context.blocks.push_back(ifBlock);
+            context.push_block(ifBlock);
+            DEBUG_PRINT((GREEN"Se ejecuta el bloque del if num: %d .\n"RESET, cond_count));
+            returnExpr = (**cond_it).block.runCode(context);
+            DEBUG_PRINT((GREEN"Se termina de ejecutar bloque del if num: %d.\n"RESET, cond_count));
+            context.pop_block();
             break;
         }
         cond_count++;
@@ -143,12 +156,10 @@ NExpression* NExpressionStatement::runCode(CodeExecutionContext& context) {
 
     if (funcName.compare("print") == 0){
         context.print(functionCall->arguments);
-        NNil* nilReturn = new NNil;
-        return nilReturn;
+        return new NNil();
     } else if (funcName.substr(0, tablePrefix.size()).compare(tablePrefix) == 0){
         cout << "ERROR: Operaciones `table` todavia no estan implementadas.\n";
-        NNil* nilReturn = new NNil;
-        return nilReturn;
+        return new NNil();
     } else {
         // Si no es ni print ni operacion table entonces devolvemos la evaluacion.
         return functionCall->evaluate(context);
@@ -161,16 +172,21 @@ NExpression* NLastStatement::runCode(CodeExecutionContext& context) {
         Puede ser un break o un return.
         En caso de ser return tiene una ExpressionList (returnList)
     */
-    if (fake){
+    DEBUG_PRINT((RED"NLastStatement::runCode.\n"RESET));
+    if (fake == 1){
+        DEBUG_PRINT((RED" - es Fake osea, Nul.\n"RESET));
         NNil* nilRes = new NNil();
         return nilRes;
     } else if (isBreak){
+        DEBUG_PRINT((RED" - es break.\n"RESET));
         NBreak* breakRes = new NBreak();
         return breakRes;
     } else if (returnList.size() == 1) {
+        DEBUG_PRINT((RED" - solo una expression de tipo %s. Se evalua.\n"RESET, returnList[0]->type_str().c_str()));
         NExpression* onlyExpr = returnList[0];
         return onlyExpr->evaluate(context);
     } else {
+        DEBUG_PRINT((RED" - es una expression list.\n"RESET));
         // Sino, tengo que evaluar de ExpressionList.
         ExpressionList* evalExpList = new ExpressionList();
         ExpressionList::const_iterator it;
@@ -262,7 +278,7 @@ NExpression* NForLoopAssign::runCode(CodeExecutionContext& context) {
             break;
         }
         CodeExecutionBlock* forBlock = new CodeExecutionBlock(block);
-        context.blocks.push_back(forBlock);
+        context.push_block(forBlock);
 
         NExpression* firstExprDouble = new NDouble(varVal);
         context.addVariable(id.name, firstExprDouble, 1);
@@ -290,7 +306,7 @@ NExpression* NForLoopAssign::runCode(CodeExecutionContext& context) {
             break;
         } // el es NIL entonces sigue normal.
 
-        context.blocks.pop_back();
+        context.pop_block();
 
         varVal = varVal + thirdVal;
 
@@ -308,6 +324,9 @@ NExpression* NForLoopAssign::runCode(CodeExecutionContext& context) {
         // Se guarda el return en forReturnList
         return forReturn;
     }
+
+    // else
+    return new NNil();
 }
 
 /*
@@ -364,7 +383,7 @@ NExpression* NFunctionCall::evaluate(CodeExecutionContext& context){
     }
 
     CodeExecutionBlock* funcBlock = new CodeExecutionBlock(funcDecl->block);
-    context.blocks.push_back(funcBlock);
+    context.push_block(funcBlock);
 
     // Tengo que mapear los arguments (NExpression) en this->arguments
     // con los de funcDecl->arguments (NIdentifier).
@@ -399,10 +418,12 @@ NExpression* NFunctionCall::evaluate(CodeExecutionContext& context){
     DEBUG_PRINT((GREEN"Se cargan %d variables, se ejecuta el bloque.\n"RESET, var_count));
     NExpression* res = funcDecl->block.runCode(context);
     DEBUG_PRINT((GREEN"Se termina de ejecutar bloque.\n"RESET));
+    DEBUG_PRINT((MAGENTA"Se tiene resultado de tipo: %s. Se evalua.\n"RESET, res->type_str().c_str()));
     res = res->evaluate(context);
+    DEBUG_PRINT((MAGENTA"Res evaluado, ahora es de tipo: %s.\n"RESET, res->type_str().c_str()));
 
     // Quito el bloque de la funcion del contexto.
-    context.blocks.pop_back();
+    context.pop_block();
 
     return res;
 }
