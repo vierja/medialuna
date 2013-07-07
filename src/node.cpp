@@ -10,6 +10,7 @@ using namespace std;
 // AUX
 
 double expressionToDouble(NExpression* expr);
+int expressionToBoolean(NExpression* expr);
 
 NExpression* NBlock::runCode(CodeExecutionContext& context) {
     DEBUG_PRINT((MAGENTA"NBlock::runCode\n"RESET));
@@ -58,6 +59,7 @@ NExpression* NMultiAssignment::runCode(CodeExecutionContext& context) {
         ExpressionList expressionList;
         int isLocal;
     */
+
     IdentifierList::const_iterator id_it;
     ExpressionList::const_iterator exp_it = expressionList.begin();
     for (id_it = idList.begin(); id_it != idList.end(); id_it++){
@@ -72,11 +74,51 @@ NExpression* NMultiAssignment::runCode(CodeExecutionContext& context) {
         }
         cout << "Se declara la variable " << varName << endl;
         context.addVariable(varName, varExpression, isLocal);
+        DEBUG_PRINT((YELLOW"Variable %s declarada\n"RESET, varName.c_str()));
 
         if (exp_it != expressionList.end()){
             exp_it++;
         }
     }
+}
+
+NExpression* NIfCond::runCode(CodeExecutionContext& context) {
+    DEBUG_PRINT((RED"NIfCond::runCode -> NO SE DEBERIA LLAMAR!!\n"RESET));
+}
+
+NExpression* NIf::runCode(CodeExecutionContext& context) {
+    /*
+        NIf tiene una lista de NIfCond en ConditionList conditions.
+        pseudo:
+        for NIfCond in conditions:
+            if NIfCond->expression.evaluate(context):
+                res = NIfCond->block.runCode(context)
+                if res != null:
+                    return res
+                break
+    */
+    int cond_count = 0;
+    DEBUG_PRINT((RED"NIf::runCode\n"RESET));
+    ConditionList::const_iterator cond_it;
+    NExpression* returnExpr;
+
+    for (cond_it = conditions.begin(); cond_it != conditions.end(); cond_it++) {
+        // Calculo el valor booleano de la expression del if en la condicion.
+        int boolValue = expressionToBoolean((**cond_it).expression.evaluate(context));
+        if (boolValue == 1) {
+            // Entramos al if. Corremos el codigo, y termina.
+            CodeExecutionBlock* ifBlock = new CodeExecutionBlock((**cond_it).block);
+            context.blocks.push_back(ifBlock);
+            DEBUG_PRINT((GREEN"Se ejecuta el bloque del for num: %d .\n"RESET, cond_count));
+            NExpression* returnExpr = (**cond_it).block.runCode(context);
+            DEBUG_PRINT((GREEN"Se termina de ejecutar bloque del for.\n"RESET));
+            context.blocks.push_back(ifBlock);
+            break;
+        }
+        cond_count++;
+    }
+
+    return returnExpr;
 }
 
 NExpression* NExpressionStatement::runCode(CodeExecutionContext& context) {
@@ -88,6 +130,7 @@ NExpression* NExpressionStatement::runCode(CodeExecutionContext& context) {
         Cuando se tiene un expression statment lo unico que importa
         es si es es NFunctionCall, en ese caso se llama a la funcion.
     */
+
     if (expression.type() != FUNCTION_CALL){
         cout << "ERROR: Unexpected expression.\n";
         exit(1);
@@ -118,9 +161,12 @@ NExpression* NLastStatement::runCode(CodeExecutionContext& context) {
         Puede ser un break o un return.
         En caso de ser return tiene una ExpressionList (returnList)
     */
-    if (isBreak || returnList.size() == 0){
+    if (fake){
         NNil* nilRes = new NNil();
         return nilRes;
+    } else if (isBreak){
+        NBreak* breakRes = new NBreak();
+        return breakRes;
     } else if (returnList.size() == 1) {
         NExpression* onlyExpr = returnList[0];
         return onlyExpr->evaluate(context);
@@ -173,49 +219,24 @@ NExpression* NForLoopAssign::runCode(CodeExecutionContext& context) {
     }
 
     // Si alguna de las expresiones no son numeros entonces es un for invalido.
-    /*
-        TODO:
-            NO REPETIR TANTO CODIGO!!
-    */
     double firstVal;
-    if (firstExpr->type() == STRING) {
-        // Primero tratamos a double.
-        istringstream ss((dynamic_cast<NString*>(firstExpr))->value);
-        if (!(ss >> firstVal)){
-            // No es double.
-            cout << "ERROR: 'for' initial value must be a number.\n";
-            exit(0);
-        }
-    } else if (firstExpr->type() == INTEGER) {
-        NInteger* intExpression = dynamic_cast<NInteger*>(firstExpr);
-        firstVal = (double) intExpression->value;
-    } else if (firstExpr->type() == DOUBLE) {
-        NDouble* doubExpression = dynamic_cast<NDouble*>(firstExpr);
-        firstVal = doubExpression->value;
-    } else {
+    try{
+        firstVal = expressionToDouble(firstExpr);
+    } catch (int e) {
         cout << "ERROR: 'for' initial value must be a number.\n";
         exit(0);
     }
+    DEBUG_PRINT((GREEN"ForLoop: firstVal = %f\n"RESET, firstVal));
     double secondVal;
-    if (secondExpr->type() == STRING) {
-        // Primero tratamos a double.
-        istringstream ss((dynamic_cast<NString*>(secondExpr))->value);
-        if (!(ss >> secondVal)){
-            // No es double.
-            cout << "ERROR: 'for' second value must be a number.\n";
-            exit(0);
-        }
-    } else if (secondExpr->type() == INTEGER) {
-        NInteger* intExpression = dynamic_cast<NInteger*>(secondExpr);
-        secondVal = (double) intExpression->value;
-    } else if (secondExpr->type() == DOUBLE) {
-        NDouble* doubExpression = dynamic_cast<NDouble*>(secondExpr);
-        secondVal = doubExpression->value;
-    } else {
+    try{
+        secondVal = expressionToDouble(secondExpr);
+    } catch (int e) {
         cout << "ERROR: 'for' second value must be a number.\n";
         exit(0);
     }
-    double thirdVal;
+    DEBUG_PRINT((GREEN"ForLoop: secondVal = %f\n"RESET, secondVal));
+
+    double thirdVal = 1;
     if (thirdExpressionDef == 1){
         try{
             thirdVal = expressionToDouble(thirdExpr);
@@ -223,83 +244,70 @@ NExpression* NForLoopAssign::runCode(CodeExecutionContext& context) {
             cout << "ERROR: 'for' third value must be a number.\n";
             exit(0);
         }
-/*        if (thirdExpr->type() == STRING) {
-            // Primero tratamos a double.
-            istringstream ss((dynamic_cast<NString*>(thirdExpr))->value);
-            if (!(ss >> thirdVal)){
-                // No es double.
-                cout << "ERROR: 'for' third value must be a number.\n";
-                exit(0);
-            }
-        } else if (thirdExpr->type() == INTEGER) {
-            NInteger* intExpression = dynamic_cast<NInteger*>(thirdExpr);
-            thirdVal = (double) intExpression->value;
-        } else if (thirdExpr->type() == DOUBLE) {
-            NDouble* doubExpression = dynamic_cast<NDouble*>(thirdExpr);
-            thirdVal = doubExpression->value;
-        } else {
-            cout << "ERROR: 'for' third value must be a number.\n";
-            exit(0);
-        }*/
+        DEBUG_PRINT((GREEN"ForLoop: thirdVal = %f\n"RESET, thirdVal));
     }
     
-    CodeExecutionBlock* forBlock = new CodeExecutionBlock(block);
-    context.blocks.push_back(forBlock);
-
-    NDouble* firstExprDouble = new NDouble(firstVal);
-    context.addVariable(id.name, firstExprDouble, 1);
 
     int blockReturned = 0;
     int blockBreaked = 0;
     int loopEndend = 0;
     double varVal = firstVal;
     int forCount = 0;
-    ExpressionList forReturnList;
+    NExpression* forReturn;
+
     while (1){
 
-        if (thirdExpressionDef == 1){
-            if ((thirdVal > 0 && varVal > secondVal) || (thirdVal < 0 && varVal <= secondVal)){
-                loopEndend = 1;
-                break;
-            }
+        if ((thirdVal > 0 && varVal > secondVal) || (thirdVal < 0 && varVal < secondVal)){
+            loopEndend = 1;
+            break;
         }
+        CodeExecutionBlock* forBlock = new CodeExecutionBlock(block);
+        context.blocks.push_back(forBlock);
 
-        DEBUG_PRINT((GREEN"Se ejecuta el bloque del for num: %d .\n"RESET, forCount));
-        NExpression* res = block.runCode(context);
-        DEBUG_PRINT((GREEN"Se termina de ejecutar bloque del for.\n"RESET));
-        if (res->type() != LAST_STATEMENT){
-            // No deberia de pasar nunca.
-            cout << "ERROR: For blocks returns invalid statement.\n";
-            exit(0);
-        }
-        NLastStatement* lastStatement = dynamic_cast<NLastStatement*>(res);
-        if (lastStatement->fake == 0) {
-            // Si es fake lo ignoramos, sino:
-            if (lastStatement->isBreak == 1) {
-                // Recibimos un break, entonces cortamos el for.
-                blockBreaked = 1;
-                break;
-            } else {
-                // Si no es break es return.
-                // Recibimos un return, entonces cortamos el for. 
-                blockReturned = 1;
-                forReturnList = lastStatement->returnList;
-                // TODO: Y termina el bloque superior.
-                break;
-            }
-        }
-
-        NExpression* firstExpr = context.getVariable(id.name);
-
-        //varVal = context.getVariable(id.name);
-        varVal = varVal + thirdVal;
-        firstExprDouble = new NDouble(firstVal);
+        NExpression* firstExprDouble = new NDouble(varVal);
         context.addVariable(id.name, firstExprDouble, 1);
 
+        DEBUG_PRINT((GREEN"Se ejecuta el bloque del for num: %d .\n"RESET, forCount++));
+        NExpression* res = block.runCode(context);
+        DEBUG_PRINT((GREEN"Se termina de ejecutar bloque del for.\n"RESET));
+
+        firstExpr = context.getVariable(id.name);
+        try{
+            varVal = expressionToDouble(firstExpr);
+        } catch (int e) {
+            // Si se captura una excepcion entonces se considera como un break;
+            blockBreaked = 1;
+            break;
+        }
+
+        if (res->type() == BREAK) {
+            blockBreaked = 1;
+            break;
+        } else if (res->type() != NIL) {
+            // Si el restul es distinto de nil entonces retorna ALGO.
+            forReturn = res;
+            blockReturned = 1;
+            break;
+        } // el es NIL entonces sigue normal.
+
+        context.blocks.pop_back();
+
+        varVal = varVal + thirdVal;
 
     }
 
 
+
+    if (blockBreaked == 1){
+        // Si se hizo break, devuelve null.
+        NNil* nilReturn = new NNil();
+        return nilReturn;
+    }
+
+    if (blockReturned == 1){
+        // Se guarda el return en forReturnList
+        return forReturn;
+    }
 }
 
 /*
@@ -500,7 +508,7 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             NExpressionList* nExprList = dynamic_cast<NExpressionList*>(&lhs);
             rEvalExpression = nExprList->exprList[0];
             rtype = rEvalExpression->type();
-        }*
+        }*/
 
         if (rtype == IDENTIFIER || rtype == FUNCTION_CALL || rtype == BINARY_OPERATOR || rtype == UNARY_OPERATOR || rtype == BLOCK || rtype == ANON_FUNCTION_DECLARATION){
             DEBUG_PRINT((YELLOW" - rhs es de tipo %s. Se evalua.\n"RESET, rhs.type_str().c_str()));
@@ -968,4 +976,20 @@ double expressionToDouble(NExpression* expr){
         throw 1;
     }
     return doubleVal;
+}
+
+int expressionToBoolean(NExpression* expr) {
+    // Es 0 solo si es false o nil
+    if (expr->type() == BOOLEAN) {
+        NBoolean* boolean = dynamic_cast<NBoolean*>(expr);
+        // Si es False entonces True.
+        return boolean->trueVal;
+    }
+
+    if (expr->type() == NIL) {
+        return 0;
+    }
+
+    // Else devuelvo 1.
+    return 1;
 }

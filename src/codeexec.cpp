@@ -5,6 +5,7 @@
 using namespace std;
 
 void* CodeExecutionContext::executeCode(NBlock& root){
+
     /*
         Se crea un nuevo CodeExecutionBlock y en el top del stack blocks.
     */
@@ -15,6 +16,7 @@ void* CodeExecutionContext::executeCode(NBlock& root){
         Run
     */
     cout << "Se corre el codigo. Size del stack: " << this->blocks.size() << endl;
+
     /*
         Un bloque esta compuesto de una lista de statements y un last statement.
     */
@@ -55,7 +57,7 @@ void CodeExecutionContext::addFunction(string name, NFunctionDeclaration* functi
         Y se sobreescriben.
     */
     CodeExecutionBlock* block = blocks.back();
-    block->functions.insert(make_pair(name, function));
+    block->functions[name] = function;
 }
 
 void CodeExecutionContext::addVariable(string name, NExpression* expression, int isLocal){
@@ -67,22 +69,27 @@ void CodeExecutionContext::addVariable(string name, NExpression* expression, int
     } else {
         // Busco la variable en la lista de bloques de atras para adelante, si la encuentro entonces la sobreescribo.
         // Si no la encuentro entonces guardo como si fuera local.
+        int seEncuentra = 0;
         vector<CodeExecutionBlock*>::reverse_iterator it;
         for (it = blocks.rbegin(); it != blocks.rend(); ++it){
+            DEBUG_PRINT((BLUE"Se busca la variable en block\n"RESET));
             // Busco si la funcion de nombre `name` esta definida en el mapa de funciones.
             if ((**it).variables.find(name) != (**it).variables.end()){
                 cout << "Se encuentra la variable " << name << " en otro bloque.\n";
                 block = (*it);
+                seEncuentra = 1;
                 break;
             }
         }
 
-        if (!block){
-            // Si no la encuentro devuelvo el local.
+        if (seEncuentra == 0) {
+            DEBUG_PRINT((BLUE"No se encuentra, se inserta en el ultimo bloque.\n"RESET));
             block = blocks.back();
         }
     }
-    block->variables.insert(make_pair(name, expression));
+    DEBUG_PRINT((GREEN"Se inserta la variable.\n"RESET));
+    block->variables[name] = expression;
+    DEBUG_PRINT((GREEN"Variable insertable.\n"RESET));
 }
 
 

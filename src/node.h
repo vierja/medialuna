@@ -35,6 +35,8 @@
 
 enum NodeType {
     MULTI_ASSIGNMENT,
+    IF_CONDITION,
+    IF,
     LAST_STATEMENT,
     EXPRESSION_STATMENT,
     //MULTI_VARIABLE_DECLARATION,
@@ -54,7 +56,8 @@ enum NodeType {
     UNARY_OPERATOR,
     BLOCK,
     ANON_FUNCTION_DECLARATION,
-    EXPRESSION
+    EXPRESSION,
+    BREAK
 };
 
 class CodeExecutionContext;
@@ -62,11 +65,13 @@ class NStatement;
 class NExpression;
 class NVariableDeclaration;
 class NIdentifier;
+class NIfCond;
 
 typedef std::vector<NStatement*> StatementList;
 typedef std::vector<NExpression*> ExpressionList;
 typedef std::vector<NVariableDeclaration*> VariableList;
 typedef std::vector<NIdentifier*> IdentifierList;
+typedef std::vector<NIfCond*> ConditionList;
 
 class Node {
 public:
@@ -131,6 +136,14 @@ public:
     NNil() { }
     NodeType type(){ return NIL; }
     std::string type_str(){ return "NIL"; }
+    NExpression* evaluate(CodeExecutionContext& context){ return this; };
+};
+
+class NBreak : public NExpression {
+public:
+    NBreak() { }
+    NodeType type(){ return BREAK; }
+    std::string type_str(){ return "BREAK"; }
     NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
@@ -310,6 +323,36 @@ public:
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
+/*
+    if algo then
+        block
+    elseif algo2 then
+        block
+    else
+        block
+    end
+*/
+class NIfCond : public NStatement {
+public:
+    NExpression& expression;
+    NBlock& block;
+    NIfCond(NExpression& expression, NBlock& block) :
+        expression(expression), block(block) { }
+    NodeType type(){ return IF_CONDITION; }
+    std::string type_str(){ return "IF_CONDITION"; }
+    NExpression* runCode(CodeExecutionContext& context);
+};
+
+class NIf : public NStatement {
+public:
+    ConditionList conditions;
+    NIf(ConditionList& conditions) :
+        conditions(conditions) { }
+    NodeType type(){ return IF; }
+    std::string type_str(){ return "IF"; }
+    NExpression* runCode(CodeExecutionContext& context);
+};
+
 class NExpressionStatement : public NStatement {
 public:
     NExpression& expression;
@@ -321,7 +364,9 @@ public:
     NExpression* runCode(CodeExecutionContext& context);
 };
 
-/*class NMultiVariableDeclaration : public NStatement {
+/*
+TODO: No se usa al final?
+class NMultiVariableDeclaration : public NStatement {
 public:
     IdentifierList idList;
     int isLocal;

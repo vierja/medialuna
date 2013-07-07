@@ -19,11 +19,13 @@
     NString *nstring;
     NLastStatement *laststat;
     NVariableDeclaration *var_decl;
+    NIfCond *ifcond;
     std::vector<NVariableDeclaration*> *varvec;
     std::vector<NExpression*> *exprvec;
     std::vector<NStatement*> *statvec;
     std::vector<NIdentifier*> *idvec;
     std::vector<NExpression*> *expvec;
+    std::vector<NIfCond*> *condvec;
     std::string *string;
     int token;
 }
@@ -70,6 +72,8 @@
 %type <idvec> namelist params setlist parlist
 %type <expvec> explist1 explist23 args /* args es mas pero todavia no lo consideramos. */
 %type <expr> exp function functioncal prefixexp /* prefixexp es mas que esto pero la parte de tables todavia no lo consideramos. */
+%type <condvec> condlist conds
+%type <ifcond> cond
 
 %left TK_KW_OR
 %left TK_KW_AND
@@ -176,6 +180,7 @@ stat        : TK_KW_FOR identifier TK_OP_ASSIGN explist23 TK_KW_DO block TK_KW_E
             | TK_KW_IF conds TK_KW_END
             {
                 /* TODO: Complicado */
+                $$ = new NIf(*$2);
             }
             | TK_KW_FUNCTION identifier params block TK_KW_END
             {
@@ -196,6 +201,7 @@ stat        : TK_KW_FOR identifier TK_OP_ASSIGN explist23 TK_KW_DO block TK_KW_E
             }
             ;
 /*
+Como solo se implementa una, se agrega la derivacion arriba.
 repetition  : TK_KW_FOR identifier TK_OP_ASSIGN explist23
             {
                 $$ = new NForLoopAssignNoBlock(*$2, *$<explist23>4);
@@ -208,14 +214,35 @@ repetition  : TK_KW_FOR identifier TK_OP_ASSIGN explist23
 */
 
 conds       : condlist
+            {
+                $$ = $1;
+            }
             | condlist TK_KW_ELSE block
+            {
+                $$ = $1;
+                // El else se puede tratar como un elseif(true)
+                NExpression* trueExpr = new NBoolean(1);
+                NIfCond* elseCond = new NIfCond(*trueExpr, *$3);
+                $$->push_back(elseCond);
+            }
             ;
 
 condlist    : cond
+            {
+                $$ = new ConditionList();
+                $$->push_back($1);
+            }
             | condlist TK_KW_ELSEIF cond
+            {
+                $$->push_back($3);
+            }
             ;
 
-cond        : exp TK_KW_THEN block ;
+cond        : exp TK_KW_THEN block
+            {
+                $$ = new NIfCond(*$1, *$3);
+            }
+            ;
 
 laststat    : TK_KW_BREAK
             {
