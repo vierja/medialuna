@@ -43,6 +43,8 @@ public:
     */
     void* executeCode(NBlock& root); // Puede devolver cualquier cosa.
 
+    void push_block(CodeExecutionBlock* ceb);
+    void pop_block();
     /*
         Devuelve la variable con el nombre `name` en el contexto.
         Empieza a buscar desde el ultimo al primero.

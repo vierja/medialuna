@@ -26,6 +26,13 @@ void* CodeExecutionContext::executeCode(NBlock& root){
     this->blocks.pop_back();
 }
 
+void CodeExecutionContext::push_block(CodeExecutionBlock* ceb){
+    this->blocks.push_block(ceb);
+}
+void CodeExecutionContext::pop_block(){
+    this->blocks.pop_back();
+}
+
 NExpression* CodeExecutionContext::getVariable(string name){
     vector<CodeExecutionBlock*>::reverse_iterator it;
     map<string, NExpression*>::iterator var_it;
@@ -214,7 +221,7 @@ void CodeExecutionContext::printFunctionsAndVariables(){
     vector<CodeExecutionBlock*>::reverse_iterator it;
     for (it = blocks.rbegin(); it != blocks.rend(); it++){
         // Busco si la funcion de nombre `name` esta definida en el mapa de funciones.
-        cout << "Bloque " << counter << ":\n";
+        cout << "Bloque " << counter++ << ":\n";
         for (map<string, NFunctionDeclaration*>::iterator it2=(**it).functions.begin(); it2!=(**it).functions.end(); ++it2){
             cout << "Function: " << it2->first << " => " << it2->second << '\n';
         }
