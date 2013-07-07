@@ -84,7 +84,7 @@ NExpression* NMultiAssignment::runCode(CodeExecutionContext& context) {
             DEBUG_PRINT((RED"Variable sin expression. Se setea como null."RESET));
             varExpression = new NNil();
         }
-        cout << "Se declara la variable " << varName << endl;
+        DEBUG_PRINT(("Se declara la variable %s\n",varName.c_str()));
         context.addVariable(varName, varExpression, isLocal);
         DEBUG_PRINT((YELLOW"Variable %s declarada\n"RESET, varName.c_str()));
 
@@ -148,7 +148,7 @@ NExpression* NExpressionStatement::runCode(CodeExecutionContext& context) {
         cout << "ERROR: Unexpected expression.\n";
         exit(1);
     }
-    cout << "NExpressionStatement::runCode" << endl;
+    DEBUG_PRINT(("NExpressionStatement::runCode\n"));
     NFunctionCall* functionCall = dynamic_cast<NFunctionCall*>(&expression);
     string funcName = functionCall->id.name;
 
@@ -350,13 +350,13 @@ NExpression* NExpressionList::evaluate(CodeExecutionContext& context) {
 
 NExpression* NIdentifier::evaluate(CodeExecutionContext& context){
     //Busco el valor de la variable en el contexto.
-    cout << "NIdentifier::evaluate\n";
+    DEBUG_PRINT(("NIdentifier::evaluate\n"));
     //Tengo que obtener el valor del identificador.
     return context.getVariable(name)->evaluate(context);
 }
 
 NExpression* NFunctionCall::evaluate(CodeExecutionContext& context){
-    cout << "NFunctionCall::evaluate\n";
+    DEBUG_PRINT(("NFunctionCall::evaluate\n"));
     /*
         Una funcionCall consiste de:
         NIdentifier& id;

@@ -15,14 +15,14 @@ void* CodeExecutionContext::executeCode(NBlock& root){
     /*
         Run
     */
-    cout << "Se corre el codigo. Size del stack: " << this->blocks.size() << endl;
+    DEBUG_PRINT(("Se corre el codigo. Size del stack: %d\n", (int) this->blocks.size()));
 
     /*
         Un bloque esta compuesto de una lista de statements y un last statement.
     */
     root.runCode(*this);
 
-    cout << "Se corrio el codigo" << endl;
+    DEBUG_PRINT(("Se corrio el codigo\n"));
     this->blocks.pop_back();
 }
 
@@ -72,7 +72,7 @@ void CodeExecutionContext::addVariable(string name, NExpression* expression, int
     if (isLocal) {
         // Si es local entonces la guardo en el ultimo bloque.
         block = blocks.back();
-        cout << "Se inserta la variable " << name << " en el ultimo bloque" << endl;
+        DEBUG_PRINT(("Se inserta la variable %s en el ultimo bloque\n", name.c_str()));
     } else {
         // Busco la variable en la lista de bloques de atras para adelante, si la encuentro entonces la sobreescribo.
         // Si no la encuentro entonces guardo como si fuera local.
@@ -82,7 +82,7 @@ void CodeExecutionContext::addVariable(string name, NExpression* expression, int
             DEBUG_PRINT((BLUE"Se busca la variable en block\n"RESET));
             // Busco si la funcion de nombre `name` esta definida en el mapa de funciones.
             if ((**it).variables.find(name) != (**it).variables.end()){
-                cout << "Se encuentra la variable " << name << " en otro bloque.\n";
+                DEBUG_PRINT(("Se encuentra la variable %s en otro bloque.\n", name.c_str()));
                 block = (*it);
                 seEncuentra = 1;
                 break;
@@ -112,7 +112,7 @@ int CodeExecutionContext::functionDefined(string name){
 }
 
 void CodeExecutionContext::print(ExpressionList exprList){
-    cout << "FUNCION PRINT ->\n";
+    DEBUG_PRINT(("FUNCION PRINT ->\n"));
     DEBUG_PRINT((GREEN"Se tienen %d expressions para imprimir\n"RESET, (int) exprList.size()));
     ExpressionList* exprListFinal = new ExpressionList();
 
@@ -142,7 +142,8 @@ void CodeExecutionContext::print(ExpressionList exprList){
             cout << "\t";
         }
     } // endfor
-    cout << "\n <- END FUNCION PRINT\n";
+    cout << endl;
+    DEBUG_PRINT(("\n <- END FUNCION PRINT\n"));
 }
 
 void CodeExecutionContext::print_expr(NExpression* expr){
@@ -174,7 +175,7 @@ void CodeExecutionContext::print_expr(NExpression* expr){
                 if (idExp != 0){
                     this->print_expr(idExp);
                 } else {
-                    cout << "VARIABLE " << ident->name << " NO EXISTE." << endl;
+                    cout << "ERROR: Variable " << ident->name << " no existe." << endl;
                     exit(0);
                 }
             }
@@ -199,10 +200,10 @@ void CodeExecutionContext::print_expr(NExpression* expr){
             }
             break;
         case BLOCK:
-            cout << "BLOCK -> NOT IMPLEMENTED" << endl;
+            cout << "ERROR: Print de block NOT IMPLEMENTED" << endl;
             break;
         case ANON_FUNCTION_DECLARATION:
-            cout << "ANON_FUNCTION_DECLARATION -> NOT IMPLEMENTED" << endl;
+            cout << "ERROR: Print de anon function declaration NOT IMPLEMENTED" << endl;
             break;
         case EXPRESSION_LIST: {
                 // TODO: Imprimir dependiendo de como se llama la funcion.
@@ -211,7 +212,7 @@ void CodeExecutionContext::print_expr(NExpression* expr){
             }
             break;
         default:
-            cout << "PRINT DEFAULT ERROR!!" << endl;
+            cout << "ERROR: PRINT DEFAULT ERROR!!" << endl;
             exit(1);
     }
 }
@@ -221,12 +222,12 @@ void CodeExecutionContext::printFunctionsAndVariables(){
     vector<CodeExecutionBlock*>::reverse_iterator it;
     for (it = blocks.rbegin(); it != blocks.rend(); it++){
         // Busco si la funcion de nombre `name` esta definida en el mapa de funciones.
-        cout << "Bloque " << counter++ << ":\n";
+        DEBUG_PRINT(("Bloque: %d\n", counter++));
         for (map<string, NFunctionDeclaration*>::iterator it2=(**it).functions.begin(); it2!=(**it).functions.end(); ++it2){
-            cout << "Function: " << it2->first << " => " << it2->second << '\n';
+            DEBUG_PRINT(("Function: %s => ...\n", it2->first.c_str()));
         }
         for (map<string, NExpression*>::iterator it2=(**it).variables.begin(); it2!=(**it).variables.end(); ++it2){
-            cout << "Expression: " << it2->first << " => " << it2->second << '\n';
+            DEBUG_PRINT(("Expression: %s => ...\n", it2->first.c_str()));
         }
     }
 }
