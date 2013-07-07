@@ -11,6 +11,7 @@ using namespace std;
 
 double expressionToDouble(NExpression* expr);
 int expressionToBoolean(NExpression* expr);
+string expressionToString(NExpression* expr);
 
 NExpression* NBlock::runCode(CodeExecutionContext& context) {
     DEBUG_PRINT((MAGENTA"NBlock::runCode\n"RESET));
@@ -631,44 +632,19 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             NBoolean* booleanResult = new NBoolean(intResult);
             return booleanResult;
         }
-    } else if (op == TK_OP_MIN_EQUALS || op == TK_OP_GRT_EQUALS) {
-        /*
-            primer caso:
-            a =< b
-            segundo caso
-            a => b
-
-            pasamos el segundo caso al primer caso haciendo:
-
-            b =< a
-        */
-
-        DEBUG_PRINT((YELLOW"Se evalua operator <= o =>\n"RESET));
-        NExpression* lefths;
-        NExpression* righths;
-
-        if (op == TK_OP_GRT_EQUALS){
-            // Invierto los operadores de lugar.
-            lefths = &rhs;
-            righths = &lhs;
-        } else {
-            // caso normal TK_OP_MIN_EQUALS
-            lefths = &lhs;
-            righths = &rhs;
-        }
-
-        /* TODO: Implementar logica */
-
-    } else if (op == TK_OP_MIN || op == TK_OP_GRT) {
+    } else if (op == TK_OP_MIN_EQUALS || op == TK_OP_GRT_EQUALS || op == TK_OP_MIN || op == TK_OP_GRT) {
         /*
             Al igual que con TK_OP_MIN_EQUALS y TK_OP_GRT_EQUALS
             cuando tenemos TK_OP_GRT invertimos de lugar para 
             no repetir logica.
+
+            left >= right
+            right >= left
         */
         NExpression* lefths;
         NExpression* righths;
 
-        if (op == TK_OP_GRT){
+        if (op == TK_OP_GRT || op == TK_OP_GRT_EQUALS){
             // Invierto los operadores de lugar.
             lefths = &rhs;
             righths = &lhs;
@@ -678,7 +654,66 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             righths = &rhs;
         }
 
-        /* TODO: Implementar logica */
+        double leftVal;
+        int leftIsNum = 0;
+        int leftIsStr = 0;
+        try{
+            leftVal = expressionToDouble(lefths);
+            leftIsNum = 1;
+        } catch (int e) {
+            if (lefths->type() != STRING){
+                cout << "ERROR: Invalid value for comparison..\n";
+                exit(0);
+            }
+            leftIsStr = 1;
+        }
+
+        double rightVal;
+        int rightIsNum = 0;
+        int rightIsStr = 0;
+        try{
+            rightVal = expressionToDouble(righths);
+            rightIsNum = 1;
+        } catch (int e) {
+            if (righths->type() != STRING){
+                cout << "ERROR: Invalid value for comparison..\n";
+                exit(0);
+            }
+            rightIsStr = 1;
+        }
+
+        if (rightIsNum != leftIsNum || rightIsStr != leftIsStr){
+            cout << "ERROR: Invalid combination of values for comparison..\n";
+            exit(0);
+        }
+
+        if (rightIsStr == 1) {
+            // Comparo strings.
+            string rightStr = expressionToString(righths);
+            string leftStr = expressionToString(lefths);
+
+            int compareStr = rightStr.compare(leftStr);
+            int trueVal = 0;
+
+            if (((op == TK_OP_MIN || op == TK_OP_GRT) && compareStr > 0) || ((op == TK_OP_MIN_EQUALS || op == TK_OP_GRT_EQUALS) && compareStr >= 0)){
+                trueVal = 1;
+            }
+            NBoolean* resExpr = new NBoolean(trueVal);
+            return resExpr;
+        }
+
+        if (rightIsNum == 1) {
+            int trueVal = 0;
+
+            if (((op == TK_OP_MIN || op == TK_OP_GRT) && leftVal < rightVal) || ((op == TK_OP_MIN_EQUALS || op == TK_OP_GRT_EQUALS) && leftVal <= rightVal)) {
+                trueVal = 1;
+            }
+            NBoolean* resExpr = new NBoolean(trueVal);
+            return resExpr;
+        }
+
+        return new NNil();
+
     } else if (op == TK_OP_DOTDOT){
         /*
         `..` es la operacion de concatenacion.
@@ -984,8 +1019,7 @@ double expressionToDouble(NExpression* expr){
         istringstream ss((dynamic_cast<NString*>(expr))->value);
         if (!(ss >> doubleVal)){
             // No es double.
-            cout << "ERROR: 'for' third value must be a number.\n";
-            exit(0);
+            throw 1;
         }
     } else if (expr->type() == INTEGER) {
         NInteger* intExpression = dynamic_cast<NInteger*>(expr);
@@ -1013,4 +1047,11 @@ int expressionToBoolean(NExpression* expr) {
 
     // Else devuelvo 1.
     return 1;
+}
+
+string expressionToString(NExpression* expr) {
+    if (expr->type() == STRING) {
+        NString* strExpr = dynamic_cast<NString*>(expr);
+        return strExpr->value;
+    }
 }
