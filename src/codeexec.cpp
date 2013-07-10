@@ -120,16 +120,14 @@ void CodeExecutionContext::print(ExpressionList exprList){
     ExpressionList::const_iterator exp_it;
     for (exp_it = exprList.begin(); exp_it != exprList.end(); exp_it++){
         NExpression* evaluatedExpression = (*exp_it)->evaluate(*this);
-        exprListFinal->push_back(evaluatedExpression);
-    }
-
-    // Si solo se tiene una expression para imprimir
-    // y esta es NExpressionList, imprimo cada una de esas.
-    // si una de varias expressiones es NExpressionList entonces imprimo normal y uso la primera.
-    if (exprListFinal->size() == 1){
-        if (exprListFinal->front()->type() == EXPRESSION_LIST){
-            NExpressionList* nExprList = dynamic_cast<NExpressionList*>(exprListFinal->front());
-            exprListFinal = &nExprList->exprList;
+        if (evaluatedExpression->type() == EXPRESSION_LIST){
+            ExpressionList::const_iterator exp_exp_list;
+            NExpressionList* nExprList = dynamic_cast<NExpressionList*>(evaluatedExpression);
+            for (exp_exp_list = nExprList->exprList.begin(); exp_exp_list != nExprList->exprList.end(); exp_exp_list++) {
+                exprListFinal->push_back(*exp_exp_list);
+            }
+        } else {
+            exprListFinal->push_back(evaluatedExpression);
         }
     }
 
