@@ -31,7 +31,7 @@ local the_universe = 42
 factors_of_the_universe = get_all_factors(the_universe)
 
 print("hola")
-print(the_universe, factors_of_the_universe)
+print(the_universe)
 
 --Print out each factor
 

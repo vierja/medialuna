@@ -4,14 +4,10 @@
 #include <math.h>
 #include <sstream>
 #include <iostream>
+#include <algorithm>
 
 using namespace std;
 
-// AUX
-
-double expressionToDouble(NExpression* expr);
-int expressionToBoolean(NExpression* expr);
-string expressionToString(NExpression* expr);
 
 NExpression* NBlock::runCode(CodeExecutionContext& context) {
     DEBUG_PRINT((MAGENTA"NBlock::runCode\n"RESET));
@@ -150,21 +146,7 @@ NExpression* NExpressionStatement::runCode(CodeExecutionContext& context) {
         exit(1);
     }
     DEBUG_PRINT(("NExpressionStatement::runCode\n"));
-    NFunctionCall* functionCall = dynamic_cast<NFunctionCall*>(&expression);
-    string funcName = functionCall->id.name;
-
-    string tablePrefix = "table.";
-
-    if (funcName.compare("print") == 0){
-        context.print(functionCall->arguments);
-        return new NNil();
-    } else if (funcName.substr(0, tablePrefix.size()).compare(tablePrefix) == 0){
-        cout << "ERROR: Operaciones `table` todavia no estan implementadas.\n";
-        return new NNil();
-    } else {
-        // Si no es ni print ni operacion table entonces devolvemos la evaluacion.
-        return functionCall->evaluate(context);
-    }
+    return expression.evaluate(context);
 }
 
 NExpression* NLastStatement::runCode(CodeExecutionContext& context) {
@@ -227,7 +209,9 @@ NExpression* NForLoopAssign::runCode(CodeExecutionContext& context) {
 
     // Las expressiones se evaluan en el contexto actual.
     NExpression* firstExpr = expressionList[0]->evaluate(context);
+    DEBUG_PRINT(("Se evalua primera expression\n"));
     NExpression* secondExpr = expressionList[1]->evaluate(context);
+    DEBUG_PRINT(("Se evalua segunda expression\n"));
     NExpression* thirdExpr;
     int thirdExpressionDef = 0;
     if (expressionList.size() == 3) {
@@ -353,11 +337,15 @@ NExpression* NIdentifier::evaluate(CodeExecutionContext& context){
     //Busco el valor de la variable en el contexto.
     DEBUG_PRINT(("NIdentifier::evaluate\n"));
     //Tengo que obtener el valor del identificador.
-    return context.getVariable(name)->evaluate(context);
+    if (name.compare("print") == 0) {
+        return this;
+    } else {
+        return context.getVariable(name)->evaluate(context);
+    }
 }
 
 NExpression* NFunctionCall::evaluate(CodeExecutionContext& context){
-    DEBUG_PRINT(("NFunctionCall::evaluate\n"));
+    DEBUG_PRINT((BOLDBLACK"NFunctionCall::evaluate\n"RESET));
     /*
         Una funcionCall consiste de:
         NIdentifier& id;
@@ -374,6 +362,29 @@ NExpression* NFunctionCall::evaluate(CodeExecutionContext& context){
         Esto devuelve una Expression (o mas bien ExpressionList)
         la cual se devuelve.
     */
+
+    string funcName = id.name;
+
+    string tablePrefix = "table.";
+    string mathPrefix = "math.";
+
+    if (funcName.compare("print") == 0){
+        context.print(arguments);
+        return new NNil();
+    } else if (funcName.substr(0, tablePrefix.size()).compare(tablePrefix) == 0){
+        DEBUG_PRINT((BOLDGREEN"Se corre funcion de la libreria table: %s\n"RESET, funcName.c_str()));
+        string tableMethod = funcName.substr(tablePrefix.size(), funcName.size());
+        NExpression* tableRes = context.table(tableMethod, arguments);
+        //cout << "ERROR: Operaciones `table` todavia no estan implementadas.\n";
+        return tableRes;
+        
+    } else if (funcName.substr(0, mathPrefix.size()).compare(mathPrefix) == 0){
+        DEBUG_PRINT((BOLDGREEN"Se corre funcion de la libreria math: %s\n"RESET, funcName.c_str()));
+        // Los argumentos de la variable de math hay que
+        string mathMethod = funcName.substr(mathPrefix.size(), funcName.size());
+        NExpression* mathRes = context.math(mathMethod, arguments);
+        return mathRes;
+    }
 
     NFunctionDeclaration* funcDecl = context.getFunction(id.name);
 
@@ -1006,6 +1017,141 @@ NExpression* NUnaryOperator::evaluate(CodeExecutionContext& context){
     }
 }
 
+NExpression* NTableFieldSingleExpression::evaluate(CodeExecutionContext& context){ }
+NExpression* NTableFieldIdentifier::evaluate(CodeExecutionContext& context){ }
+NExpression* NTableFieldExpression::evaluate(CodeExecutionContext& context){ }
+NExpression* NTableFieldList::evaluate(CodeExecutionContext& context){ }
+NExpression* NTable::evaluate(CodeExecutionContext& context){
+    /*
+    Las NTable estan compuestas por un NTableFieldList
+    Este tiene una lista de tipo TableFieldList que 
+    puede tener elementos de tipo:
+        NTableFieldSingleExpression
+        NTableFieldIdentifier
+        NTableFieldExpression
+
+    La idea en evaluarla es pasar todos los tipos a:
+    NTableFieldExpression
+     (compuesto de keyExpr y valExpr, con Expressiones finales (sin evaluacion)).
+
+    Esto se debera ejecutar en la definicion de la NTable como en la evaluacion
+    subsecuente.
+
+    Idealmente luego de la inicializacion no se deberia de tener que cambiar los tipos
+    (a NTableFieldExpression) pero puede llegar pasar.
+
+    La idea es recorrer la lista, manteniendo un contador para los campos que no tienen key.
+    Y evaluando las expressiones agregandolas en un mapa.
+    
+    En lo ideal se tendria un mapa en vez de una lista, pero como la implementacion permite claves
+    variadas para no complicarla implementados las primitivas de mapas a partir de la lista.
+
+    En el caso de tener claves repetidas se sobreescriben.
+
+    */
+
+    int countSinKey = 1; // Los que no tienen indice se empiezan a contar desde 1.
+    TableFieldList* normalTableFieldList = new TableFieldList();
+
+    GenericTableFieldList::const_iterator tf_it;
+    for (tf_it = fieldList.fieldList.begin(); tf_it != fieldList.fieldList.end(); tf_it++) {
+        if ((*tf_it)->type() == TABLE_FIELD_SINGLE_EXPRESSION) {
+
+            NTableFieldSingleExpression* tablFieldSingleExpr = dynamic_cast<NTableFieldSingleExpression*>(*tf_it);
+
+            NExpression* intKey = new NInteger(countSinKey);
+            NExpression* valExpr = tablFieldSingleExpr->expression.evaluate(context);
+            NTableFieldExpression* evaluated = new NTableFieldExpression(*intKey, *valExpr, true);
+
+            normalTableFieldList->push_back(evaluated);
+            countSinKey++;
+
+        } else if ((*tf_it)->type() == TABLE_FIELD_IDENTIFIER) {
+
+            NTableFieldIdentifier* tablFieldIdenExpr = dynamic_cast<NTableFieldIdentifier*>(*tf_it);
+
+            // Se busca el Identifier en el contexto, y se evalua.
+
+            NExpression* keyExpr = tablFieldIdenExpr->identifier.evaluate(context);
+            NExpression* valExpr = tablFieldIdenExpr->expression.evaluate(context);
+            NTableFieldExpression* evaluated = new NTableFieldExpression(*keyExpr, *valExpr, false);
+
+            normalTableFieldList->push_back(evaluated);
+
+        } else if ((*tf_it)->type() == TABLE_FIELD_LIST) {
+
+            NTableFieldExpression* tablFieldExpr = dynamic_cast<NTableFieldExpression*>(*tf_it);
+
+            NExpression* keyExpr = tablFieldExpr->keyExpr.evaluate(context);
+            NExpression* valExpr = tablFieldExpr->valExpr.evaluate(context);
+            NTableFieldExpression* evaluated = new NTableFieldExpression(*keyExpr, *valExpr, false);
+
+            normalTableFieldList->push_back(evaluated);
+
+        } else {
+            cout << "ERROR: Invalid expression in table evaluation.\n";
+            exit(0);
+        }
+    }
+
+    //TODO: Falta no agregar duplicados.
+    NTableExpr* evalTable = new NTableExpr();
+    evalTable->fieldList = normalTableFieldList;
+    return evalTable;
+}
+
+void NTableExpr::add_field(NExpression* keyExpr, NExpression* valExpr, bool auto_incremented) {
+    remove_field(keyExpr);
+    NTableFieldExpression* fieldExpr = new NTableFieldExpression(*keyExpr, *valExpr, auto_incremented);
+    fieldList->push_back(fieldExpr);
+}
+
+void NTableExpr::add_field(NExpression* valExpr) {
+    // Sin key, se utiliza el counter.
+    NInteger* keyExpr = new NInteger(counter);
+    add_field(keyExpr, valExpr, true);
+    counter++;
+}
+
+void NTableExpr::remove_field(NExpression* keyExpr){
+    TableFieldList::iterator field_it;
+    for (field_it = fieldList->begin(); field_it != fieldList->end();) {
+        NTableFieldExpression* fieldExpr = dynamic_cast<NTableFieldExpression*>(*field_it);
+        if (fieldExpr->keyExpr.type() != keyExpr->type()) {
+            ++field_it;
+        } else if (keyExpr->type() == STRING && expressionToString(keyExpr).compare(expressionToString(&fieldExpr->keyExpr)) != 0) {
+            ++field_it;
+        } else if (keyExpr->type() == BOOLEAN && expressionToBoolean(keyExpr) != expressionToBoolean(&fieldExpr->keyExpr)) {
+            ++field_it;
+        } else if ((keyExpr->type() == INTEGER || keyExpr->type() == DOUBLE) && expressionToDouble(keyExpr) != expressionToDouble(&fieldExpr->keyExpr)) {
+            ++field_it;
+        } else {
+            field_it = fieldList->erase(field_it);
+        }
+    }
+}
+
+void NTableExpr::sort_fields() {
+    // Asumo que es una table con indices enteros y 
+    sort(fieldList->begin(), fieldList->end(), compareTableFields);
+    // Itero insertando con indices
+    TableFieldList* sorted = new TableFieldList();
+    TableFieldList::iterator field_it;
+    int counter = 1;
+    for (field_it = fieldList->begin(); field_it != fieldList->end(); field_it++) {
+        if ((*field_it)->auto_incremented) {
+            NExpression* keyExpr = new NInteger(counter);
+            NTableFieldExpression* fieldExpr = new NTableFieldExpression(*keyExpr, (*field_it)->valExpr, true);
+            sorted->push_back(fieldExpr);
+            counter++;
+        } else {
+            NTableFieldExpression* fieldExpr = new NTableFieldExpression((*field_it)->keyExpr, (*field_it)->valExpr, false);
+            sorted->push_back(fieldExpr);
+        }
+    }
+    fieldList = sorted;
+}
+
 NExpression* NBlock::evaluate(CodeExecutionContext& context){
     
 }
@@ -1013,6 +1159,8 @@ NExpression* NBlock::evaluate(CodeExecutionContext& context){
 NExpression* NAnonFunctionDeclaration::evaluate(CodeExecutionContext& context){
     
 }
+
+
 
 double expressionToDouble(NExpression* expr){
     double doubleVal;
@@ -1056,4 +1204,25 @@ string expressionToString(NExpression* expr) {
         NString* strExpr = dynamic_cast<NString*>(expr);
         return strExpr->value;
     }
+}
+
+bool compareTableFields(NTableFieldExpression* a, NTableFieldExpression* b) {
+    DEBUG_PRINT((RED"Comparo con compareTableFields\n"RESET));
+    // a < b
+    if (a->valExpr.type() == STRING && (b->valExpr.type() == INTEGER || b->valExpr.type() == DOUBLE)){
+        DEBUG_PRINT((RED"El primero es string devuelvo false.\n"RESET));
+        return false;
+    }
+
+    if ((a->valExpr.type() == INTEGER || a->valExpr.type() == DOUBLE) && (b->valExpr.type() == INTEGER || b->valExpr.type() == DOUBLE)){
+        
+        double aDouble = expressionToDouble(&a->valExpr);
+        double bDouble = expressionToDouble(&b->valExpr);
+        DEBUG_PRINT((BOLDRED"Comparo los valores a = %f, b = %f\n"RESET, aDouble, bDouble));
+        return aDouble < bDouble;
+    }
+
+    DEBUG_PRINT((RED"Comparacion por default\n"RESET));
+
+    return true;
 }

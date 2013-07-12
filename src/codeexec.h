@@ -79,6 +79,16 @@ public:
     int functionDefined(string name);
 
     /*
+        Realiza operaciones math.* que son independientes del contexto.
+    */
+    NExpression* math(string method, ExpressionList exprList);
+
+    /*
+        Realiza operaciones table.* que son independientes del contexto.
+    */
+    NExpression* table(string method, ExpressionList exprList);
+
+    /*
         Analogo al `print` de Lua.
     */
     void print(ExpressionList exprList);
@@ -89,11 +99,18 @@ public:
     void print_expr(NExpression* expr);
 
     /*
+        Auxiliar.
+    */
+    ExpressionList* expandExpressionList(ExpressionList exprList);
+
+    /*
         Para debuggear.
         Imprime las variables y funciones del contexto recorriendo los bloques
         del ultimo hacia el primero.
     */
     void printFunctionsAndVariables();
 };
+
+ExpressionList* expandExpressionList(ExpressionList exprList);
 
 #endif

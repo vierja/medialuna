@@ -57,7 +57,13 @@ enum NodeType {
     BLOCK,
     ANON_FUNCTION_DECLARATION,
     EXPRESSION,
-    BREAK
+    BREAK,
+    TABLE_FIELD_SINGLE_EXPRESSION,
+    TABLE_FIELD_IDENTIFIER,
+    TABLE_FIELD_EXPRESSION,
+    TABLE_FIELD_LIST,
+    TABLE,
+    TABLE_EXPRESSION
 };
 
 class CodeExecutionContext;
@@ -66,12 +72,16 @@ class NExpression;
 class NVariableDeclaration;
 class NIdentifier;
 class NIfCond;
+class NTableField;
+class NTableFieldExpression;
 
 typedef std::vector<NStatement*> StatementList;
 typedef std::vector<NExpression*> ExpressionList;
 typedef std::vector<NVariableDeclaration*> VariableList;
 typedef std::vector<NIdentifier*> IdentifierList;
 typedef std::vector<NIfCond*> ConditionList;
+typedef std::vector<NTableField*> GenericTableFieldList;
+typedef std::vector<NTableFieldExpression*> TableFieldList;
 
 class Node {
 public:
@@ -259,6 +269,76 @@ public:
     NodeType type(){ return UNARY_OPERATOR; }
     std::string type_str(){ return "UNARY_OPERATOR"; }
     NExpression* evaluate(CodeExecutionContext& context);
+};
+
+class NTableField : public NExpression {
+};
+
+class NTableFieldSingleExpression : public NTableField {
+public:
+    NExpression& expression;
+    NTableFieldSingleExpression(NExpression& expression) :
+        expression(expression) {}
+    NodeType type(){ return TABLE_FIELD_SINGLE_EXPRESSION; }
+    std::string type_str(){ return "TABLE_FIELD_SINGLE_EXPRESSION"; }
+    NExpression* evaluate(CodeExecutionContext& context);
+};
+
+class NTableFieldIdentifier : public NTableField {
+public:
+    NIdentifier& identifier;
+    NExpression& expression;
+    NTableFieldIdentifier(NIdentifier& identifier, NExpression& expression) :
+        identifier(identifier), expression(expression) {}
+    NodeType type(){ return TABLE_FIELD_IDENTIFIER; }
+    std::string type_str(){ return "TABLE_FIELD_IDENTIFIER"; }
+    NExpression* evaluate(CodeExecutionContext& context);
+};
+
+class NTableFieldExpression : public NTableField {
+public:
+    NExpression& keyExpr;
+    NExpression& valExpr;
+    int auto_incremented;
+    NTableFieldExpression(NExpression& keyExpr, NExpression& valExpr, int auto_incremented) :
+        keyExpr(keyExpr), valExpr(valExpr), auto_incremented(auto_incremented) {}
+    NodeType type(){ return TABLE_FIELD_EXPRESSION; }
+    std::string type_str(){ return "TABLE_FIELD_EXPRESSION"; }
+    NExpression* evaluate(CodeExecutionContext& context);
+};
+
+class NTableFieldList : public NExpression {
+public:
+    GenericTableFieldList fieldList;
+    NTableFieldList(GenericTableFieldList fieldList) :
+        fieldList(fieldList) {}
+    NodeType type(){ return TABLE_FIELD_LIST; }
+    std::string type_str(){ return "TABLE_FIELD_LIST"; }
+    NExpression* evaluate(CodeExecutionContext& context);
+};
+
+class NTable : public NExpression {
+public:
+    NTableFieldList& fieldList;
+    NTable(NTableFieldList& fieldList) :
+        fieldList(fieldList) {}
+    NodeType type(){ return TABLE; }
+    std::string type_str(){ return "TABLE"; }
+    NExpression* evaluate(CodeExecutionContext& context);
+};
+
+class NTableExpr : public NExpression {
+public:
+    int counter;
+    TableFieldList* fieldList;
+    NTableExpr() : counter(1) {};
+    NodeType type(){ return TABLE_EXPRESSION; }
+    std::string type_str(){ return "TABLE_EXPRESSION"; }
+    NExpression* evaluate(CodeExecutionContext& context) { return this; };
+    void add_field(NExpression* valExpr);
+    void add_field(NExpression* keyExpr, NExpression* valExpr, bool auto_incremented);
+    void remove_field(NExpression* keyExpr);
+    void sort_fields();
 };
 
 /*
@@ -475,5 +555,11 @@ public:
     std::string type_str(){ return "FUNCTION_DECLARATION"; }
     NExpression* runCode(CodeExecutionContext& context);
 };
+
+//Aux
+double expressionToDouble(NExpression* expr);
+int expressionToBoolean(NExpression* expr);
+std::string expressionToString(NExpression* expr);
+bool compareTableFields(NTableFieldExpression* a, NTableFieldExpression* b);
 
 #endif NODE_H

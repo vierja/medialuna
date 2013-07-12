@@ -19,6 +19,8 @@
     NString *nstring;
     NLastStatement *laststat;
     NVariableDeclaration *var_decl;
+    NTableFieldList* tablfields;
+    NTableField* tablfield;
     NIfCond *ifcond;
     std::vector<NVariableDeclaration*> *varvec;
     std::vector<NExpression*> *exprvec;
@@ -71,9 +73,11 @@
 %type <laststat> laststat
 %type <idvec> namelist params setlist parlist
 %type <expvec> explist1 explist23 args /* args es mas pero todavia no lo consideramos. */
-%type <expr> exp function functioncal prefixexp /* prefixexp es mas que esto pero la parte de tables todavia no lo consideramos. */
+%type <expr> exp function functioncal tableconstr prefixexp/* prefixexp es mas que esto pero la parte de tables todavia no lo consideramos. */
 %type <condvec> condlist conds
 %type <ifcond> cond
+%type <tablfields> fieldlist
+%type <tablfield> field
 
 %left TK_KW_OR
 %left TK_KW_AND
@@ -274,7 +278,6 @@ binding     : TK_KW_LOCAL namelist
                     namelist es IdentifierList
                     explist1 es ExpressionList
                 */
-                std::cout << "NMultiAssignment(" << $2 << "," << $4 << ");" << std::endl;
                 $$ = new NMultiAssignment(*$2, *$4, 1);
                 /* el 1 es porque es ```local``` */
                 /* Borro las listas generadas */
@@ -368,7 +371,7 @@ exp         : TK_KW_NIL
             }
             | tableconstr
             {
-                /* TODO : No me quiero meter con tablas por ahora. */
+                $$ = $1;
             }
             | TK_KW_NOT exp
             {
@@ -588,18 +591,42 @@ parlist     : /* vacio */
             }
             ; /* TODO: FALTAN 2 mas: "..." y "namelist ...". Ver que hacer con ... */
 
-/* Ignoramos las tables hasta tener una version funcionando */
 tableconstr : TK_OP_OPEN_BRACE TK_OP_CLOS_BRACE
+            {
+                GenericTableFieldList* emptyList = new GenericTableFieldList();
+                NTableFieldList* fieldList = new NTableFieldList(*emptyList); 
+                $$ = new NTable(*fieldList);
+            }
             | TK_OP_OPEN_BRACE fieldlist TK_OP_CLOS_BRACE
+            {
+                $$ = new NTable(*$2);
+            }
             ; /* TODO: Falta una que no entendi */
 
 fieldlist   : field
+            {
+                GenericTableFieldList* fieldList = new GenericTableFieldList();
+                fieldList->push_back($1);
+                $$ = new NTableFieldList(*fieldList);
+            }
             | fieldlist TK_OP_COMA field
+            {
+                $1->fieldList.push_back($3);
+            }
             ; /* TODO: Falta una que no entendi. */
 
 field       : exp
+            {
+                $$ = new NTableFieldSingleExpression(*$1);
+            }
             | identifier TK_OP_ASSIGN exp
+            {
+                $$ = new NTableFieldIdentifier(*$1, *$3);
+            }
             | TK_OP_OPEN_BRACK exp TK_OP_CLOS_BRACK TK_OP_ASSIGN exp
+            {
+                $$ = new NTableFieldExpression(*$2, *$5, false);
+            }
             ;
 
 %%

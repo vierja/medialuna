@@ -16,7 +16,7 @@ medialuna: parser.cpp codeexec.cpp main.cpp scanner.cpp node.cpp
 
 test_files := $(wildcard ../test_*)
 
-test: medialuna test_compare test_if test_for_loop test_print_expressions test_simple_functions
+test: medialuna test_compare test_if test_for_loop test_print_expressions test_simple_functions test_math test_table
 
 test_compare:
 	./medialuna ../test/test_compare.lua > test_compare_medialuna.txt
@@ -47,3 +47,15 @@ test_simple_functions:
 	lua ../test/test_simple_functions.lua > test_simple_functions_lua.txt
 	diff test_simple_functions_medialuna.txt test_simple_functions_lua.txt
 	rm test_simple_functions_medialuna.txt test_simple_functions_lua.txt
+
+test_math:
+	./medialuna ../test/test_math.lua > test_math_medialuna.txt
+	lua ../test/test_math.lua > test_math_lua.txt
+	diff test_math_medialuna.txt test_math_lua.txt
+	rm test_math_medialuna.txt test_math_lua.txt
+
+test_table:
+	./medialuna ../test/test_table.lua > test_table_medialuna.txt
+	lua ../test/test_table.lua > test_table_lua.txt
+	diff test_table_medialuna.txt test_table_lua.txt
+	rm test_table_medialuna.txt test_table_lua.txt
