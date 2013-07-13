@@ -1,5 +1,5 @@
-#include "node.h"
-#include "codeexec.h"
+#include "node.hpp"
+#include "codeexec.hpp"
 #include "parser.hpp"
 #include <math.h>
 #include <sstream>

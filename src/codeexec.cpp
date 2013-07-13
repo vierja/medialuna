@@ -1,5 +1,5 @@
-#include "node.h"
-#include "codeexec.h"
+#include "node.hpp"
+#include "codeexec.hpp"
 #include "parser.hpp" /* para tener acceso al enum de tokens */
 #define _USE_MATH_DEFINES
 #include "math.h"

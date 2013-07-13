@@ -87,8 +87,6 @@ typedef std::vector<NTableFieldExpression*> TableFieldList;
 class Node {
 public:
     virtual ~Node() {}
-    virtual NodeType type() = 0;
-    virtual std::string type_str() = 0;
 };
 
 class NExpression : public Node {
@@ -101,9 +99,7 @@ public:
 
 class NStatement : public Node {
 public:
-    virtual NodeType type() = 0;
     virtual NExpression* runCode(CodeExecutionContext& context) = 0;
-    virtual std::string type_str() = 0;
 };
 
 /*
@@ -340,8 +336,6 @@ public:
     int isLocal;
     NMultiAssignment(ExpressionList idList, ExpressionList expressionList, int isLocal) :
         idList(idList), expressionList(expressionList), isLocal(isLocal) { }
-    NodeType type(){ return MULTI_ASSIGNMENT; }
-    std::string type_str(){ return "MULTI_ASSIGNMENT"; }
     NExpression* runCode(CodeExecutionContext& context);
 };
 
@@ -355,8 +349,6 @@ public:
         isBreak(isBreak), returnList(returnList), fake(0) { }
     NLastStatement(int isBreak, ExpressionList& returnList, int fake):
         isBreak(isBreak), returnList(returnList), fake(fake) { }
-    NodeType type(){ return LAST_STATEMENT; }
-    std::string type_str(){ return "LAST_STATEMENT"; }
     NExpression* runCode(CodeExecutionContext& context);
 };
 
@@ -401,8 +393,6 @@ public:
     NBlock& block;
     NIfCond(NExpression& expression, NBlock& block) :
         expression(expression), block(block) { }
-    NodeType type(){ return IF_CONDITION; }
-    std::string type_str(){ return "IF_CONDITION"; }
     NExpression* runCode(CodeExecutionContext& context);
 };
 
@@ -411,8 +401,6 @@ public:
     ConditionList conditions;
     NIf(ConditionList& conditions) :
         conditions(conditions) { }
-    NodeType type(){ return IF; }
-    std::string type_str(){ return "IF"; }
     NExpression* runCode(CodeExecutionContext& context);
 };
 
@@ -421,9 +409,6 @@ public:
     NExpression& expression;
     NExpressionStatement(NExpression& expression) :
         expression(expression) { }
-    NodeType type(){ return EXPRESSION_STATMENT; }
-    std::string type_str(){ return "EXPRESSION_STATMENT"; }
-
     NExpression* runCode(CodeExecutionContext& context);
 };
 
@@ -435,8 +420,6 @@ public:
         id(id) { }
     NVariableDeclaration(NIdentifier& id, NExpression *assignmentExpr) :
         id(id), assignmentExpr(assignmentExpr) { }
-    NodeType type(){ return VARIABLE_DECLARATION; }
-    std::string type_str(){ return "VARIABLE_DECLARATION"; }
     NExpression* runCode(CodeExecutionContext& context);
 };
 
@@ -456,8 +439,6 @@ public:
     NBlock& block;
     NForLoopIn(ExpressionList nameList, ExpressionList expressionList, NBlock& block) :
         nameList(nameList), expressionList(expressionList), block(block) { }
-    NodeType type(){ return FOR_LOOP_IN; }
-    std::string type_str(){ return "FOR_LOOP_IN"; }
     NExpression* runCode(CodeExecutionContext& context);
 }; 
 
@@ -479,8 +460,6 @@ public:
     NBlock& block;
     NForLoopAssign(NIdentifier& id, ExpressionList expressionList, NBlock& block) :
         id(id), expressionList(expressionList), block(block) { }
-    NodeType type(){ return FOR_LOOP_ASSIGN; }
-    std::string type_str(){ return "FOR_LOOP_ASSIGN"; }
     NExpression* runCode(CodeExecutionContext& context);
 };
 
@@ -521,8 +500,6 @@ public:
     NBlock& block;
     NFunctionDeclaration(NIdentifier& id, ExpressionList& arguments, NBlock& block) :
         id(id), arguments(arguments), block(block) { }
-    NodeType type(){ return FUNCTION_DECLARATION; }
-    std::string type_str(){ return "FUNCTION_DECLARATION"; }
     NExpression* runCode(CodeExecutionContext& context);
 };
 
