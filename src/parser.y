@@ -1,7 +1,7 @@
 %error-verbose
 
 %{
-    #include "node.h"
+    #include "node.hpp"
     NBlock *programBlock;
 
     extern int yylex();
