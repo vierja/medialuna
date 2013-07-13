@@ -17,11 +17,9 @@
     NIdentifier *ident;
     NString *nstring;
     NLastStatement *laststat;
-    NVariableDeclaration *var_decl;
     NTableFieldList* tablfields;
     NTableField* tablfield;
     NIfCond *ifcond;
-    std::vector<NVariableDeclaration*> *varvec;
     std::vector<NExpression*> *exprvec;
     std::vector<NStatement*> *statvec;
     std::vector<NIdentifier*> *idvec;
@@ -272,7 +270,7 @@ binding     : TK_KW_LOCAL namelist
             | TK_KW_LOCAL namelist TK_OP_ASSIGN explist1
             {
                 /*
-                    namelist es IdentifierList
+                    namelist es ExpressionList
                     explist1 es ExpressionList
                 */
                 $$ = new NMultiAssignment(*$2, *$4, 1);

@@ -44,7 +44,7 @@ NExpression* NFunctionDeclaration::runCode(CodeExecutionContext& context) {
         ¿Como se guarda?
 
         NIdentifier& id;
-        IdentifierList arguments;
+        ExpressionList arguments;
         NBlock& block;
     */
     string funcName = id.name;
@@ -61,7 +61,7 @@ NExpression* NMultiAssignment::runCode(CodeExecutionContext& context) {
         en cuenta.
         Si es local entonces hay que ver como tener prioridad ante el resto.
 
-        IdentifierList idList;
+        ExpressionList idList;
         ExpressionList expressionList;
         int isLocal;
     */

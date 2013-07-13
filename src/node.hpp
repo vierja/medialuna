@@ -70,7 +70,6 @@ enum NodeType {
 class CodeExecutionContext;
 class NStatement;
 class NExpression;
-class NVariableDeclaration;
 class NIdentifier;
 class NIfCond;
 class NTableField;
@@ -78,8 +77,6 @@ class NTableFieldExpression;
 
 typedef std::vector<NStatement*> StatementList;
 typedef std::vector<NExpression*> ExpressionList;
-typedef std::vector<NVariableDeclaration*> VariableList;
-typedef std::vector<NIdentifier*> IdentifierList;
 typedef std::vector<NIfCond*> ConditionList;
 typedef std::vector<NTableField*> GenericTableFieldList;
 typedef std::vector<NTableFieldExpression*> TableFieldList;
@@ -404,17 +401,6 @@ public:
     NExpression& expression;
     NExpressionStatement(NExpression& expression) :
         expression(expression) { }
-    NExpression* runCode(CodeExecutionContext& context);
-};
-
-class NVariableDeclaration : public NStatement {
-public:
-    NIdentifier& id;
-    NExpression *assignmentExpr;
-    NVariableDeclaration(NIdentifier& id) :
-        id(id) { }
-    NVariableDeclaration(NIdentifier& id, NExpression *assignmentExpr) :
-        id(id), assignmentExpr(assignmentExpr) { }
     NExpression* runCode(CodeExecutionContext& context);
 };
 
