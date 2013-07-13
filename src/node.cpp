@@ -427,12 +427,6 @@ NExpression* NForLoopAssign::runCode(CodeExecutionContext& context) {
     return new NNil();
 }
 
-/*
-NExpression* NMultiVariableDeclaration::runCode(CodeExecutionContext& context) {
-
-}
-*/
-
 NExpression* NExpressionList::evaluate(CodeExecutionContext& context) {
     ExpressionList* evalExpList = new ExpressionList();
     ExpressionList::const_iterator it;
@@ -574,7 +568,7 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
     */
     if (op == TK_KW_OR) {
         DEBUG_PRINT((YELLOW"Se evalua operator OR\n"RESET));
-        NodeType ltype = lhs.type();
+        ExpressionType ltype = lhs.type();
         NExpression* lEvalExpression;
 
          // Si es de un tipo que hay que evaluar, se evalua primero y luego flujo normal.
@@ -610,7 +604,7 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             return rhs.evaluate(context);
         }
     } else if (op == TK_KW_AND) {
-        NodeType ltype = lhs.type();
+        ExpressionType ltype = lhs.type();
         NExpression* lEvalExpression;
 
          // Si es de un tipo que hay que evaluar, se evalua primero y luego flujo normal.
@@ -638,8 +632,8 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
         return rhs.evaluate(context);
     } else if (op == TK_OP_EQUALS || op == TK_OP_DIFF) {
         DEBUG_PRINT((YELLOW"Se evalua == o ~==\n"RESET));
-        NodeType ltype = lhs.type();
-        NodeType rtype = rhs.type();
+        ExpressionType ltype = lhs.type();
+        ExpressionType rtype = rhs.type();
         NExpression* lEvalExpression;
         NExpression* rEvalExpression;
 
@@ -848,8 +842,8 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
         Se puede realizar solo a STRING, o NUMBER
         */
         DEBUG_PRINT((YELLOW"Se evalua '..'\n"RESET));
-        NodeType ltype = lhs.type();
-        NodeType rtype = rhs.type();
+        ExpressionType ltype = lhs.type();
+        ExpressionType rtype = rhs.type();
         NExpression* lEvalExpression;
         NExpression* rEvalExpression;
 
@@ -918,8 +912,8 @@ NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
             Si falla la conversion entonces falla el operador.
         */
         DEBUG_PRINT((YELLOW"Se evalua operator de numeros\n"RESET));
-        NodeType ltype = lhs.type();
-        NodeType rtype = rhs.type();
+        ExpressionType ltype = lhs.type();
+        ExpressionType rtype = rhs.type();
         NExpression* lEvalExpression;
         NExpression* rEvalExpression;
 
@@ -1042,7 +1036,7 @@ NExpression* NUnaryOperator::evaluate(CodeExecutionContext& context){
         */
         // Evaluo la expresion si es necesario.
         DEBUG_PRINT((YELLOW"Se evalua '-' unario\n"RESET));
-        NodeType rtype = rhs.type();
+        ExpressionType rtype = rhs.type();
         NExpression* rEvalExpression;
 
         if (rtype == IDENTIFIER || rtype == FUNCTION_CALL || rtype == BINARY_OPERATOR || rtype == UNARY_OPERATOR || rtype == BLOCK || rtype == ANON_FUNCTION_DECLARATION){
@@ -1101,7 +1095,7 @@ NExpression* NUnaryOperator::evaluate(CodeExecutionContext& context){
 
         // Evaluo la expresion si es necesario.
         DEBUG_PRINT((YELLOW"Se evalua 'not'\n"RESET));
-        NodeType rtype = rhs.type();
+        ExpressionType rtype = rhs.type();
         NExpression* rEvalExpression;
 
         if (rtype == IDENTIFIER || rtype == FUNCTION_CALL || rtype == BINARY_OPERATOR || rtype == UNARY_OPERATOR || rtype == BLOCK || rtype == ANON_FUNCTION_DECLARATION){
@@ -1235,6 +1229,9 @@ void NTableExpr::add_field(NExpression* valExpr) {
 
 void NTableExpr::remove_field(NExpression* keyExpr){
     TableFieldList::iterator field_it;
+    bool deleted = false;
+    bool auto_incremented = false;
+    int index_val;
     for (field_it = fieldList->begin(); field_it != fieldList->end();) {
         NTableFieldExpression* fieldExpr = dynamic_cast<NTableFieldExpression*>(*field_it);
         if (fieldExpr->keyExpr.type() != keyExpr->type()) {
@@ -1246,6 +1243,11 @@ void NTableExpr::remove_field(NExpression* keyExpr){
         } else if ((keyExpr->type() == INTEGER || keyExpr->type() == DOUBLE) && expressionToDouble(keyExpr) != expressionToDouble(&fieldExpr->keyExpr)) {
             ++field_it;
         } else {
+            deleted = true;
+            if (fieldExpr->auto_incremented) {
+                index_val = (int) (dynamic_cast<NInteger*>(&fieldExpr->keyExpr))->value;
+                auto_incremented = true;
+            }
             field_it = fieldList->erase(field_it);
         }
     }
@@ -1270,10 +1272,6 @@ void NTableExpr::sort_fields() {
         }
     }
     fieldList = sorted;
-}
-
-NExpression* NBlock::evaluate(CodeExecutionContext& context){
-    
 }
 
 NExpression* NAnonFunctionDeclaration::evaluate(CodeExecutionContext& context){

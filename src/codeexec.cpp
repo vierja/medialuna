@@ -342,6 +342,15 @@ NExpression* CodeExecutionContext::table(string method, ExpressionList exprList)
 
     } else if (method.compare("sort") == 0) {
         tableExpr->sort_fields();
+    } else if (method.compare("remove") == 0) {
+        if (exprListExpanded->size() < 2) {
+            cout << "ERROR: Invalid number of params in table.remove.\n";
+            exit(0);
+        }
+        ExpressionList::iterator expr_it = exprListExpanded->begin();
+        expr_it++;
+        NExpression* valExpr = *expr_it;
+        tableExpr->remove_field(valExpr);
     }
     return new NNil();
 }
