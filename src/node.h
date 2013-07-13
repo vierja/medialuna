@@ -63,7 +63,8 @@ enum NodeType {
     TABLE_FIELD_EXPRESSION,
     TABLE_FIELD_LIST,
     TABLE,
-    TABLE_EXPRESSION
+    TABLE_EXPRESSION,
+    TABLE_FIELD_KEY
 };
 
 class CodeExecutionContext;
@@ -86,6 +87,8 @@ typedef std::vector<NTableFieldExpression*> TableFieldList;
 class Node {
 public:
     virtual ~Node() {}
+    virtual NodeType type() = 0;
+    virtual std::string type_str() = 0;
 };
 
 class NExpression : public Node {
@@ -93,6 +96,7 @@ public:
     virtual NodeType type() { return EXPRESSION; };
     virtual std::string type_str() { return "EXPRESSION"; };
     virtual NExpression* evaluate(CodeExecutionContext& context) = 0;
+    virtual NExpression* clone() const = 0;
 };
 
 class NStatement : public Node {
@@ -101,39 +105,6 @@ public:
     virtual NExpression* runCode(CodeExecutionContext& context) = 0;
     virtual std::string type_str() = 0;
 };
-
-/*
-    TODO: Ignorar hasta demostrar que se puede usar un subset de NExpression como valor de retorno.
-    Valor de retorno de una funcion, no se usa en el parsing
-    pero si se utiliza en la ejecucion del codigo.
-/*
-/*
-
-class NReturnValue : public Node {
-
-};
-
-/*
-    No retorna nada.
-
-class NReturnNil : public NReturnValue {
-public:
-    NReturnValue(){}
-};
-
-class NReturnBoolean : public NReturnValue {
-public:
-    int trueVal;
-    NReturnValue(int trueVal): trueVal(trueVal) { }
-};
-class NReturnInteger : public NReturnValue {
-public:
-
-};
-
-*/
-
-
 
 /*
     Valor Nil.
@@ -147,6 +118,8 @@ public:
     NodeType type(){ return NIL; }
     std::string type_str(){ return "NIL"; }
     NExpression* evaluate(CodeExecutionContext& context){ return this; };
+    virtual NNil* clone() const { return new NNil(*this); }
+
 };
 
 class NBreak : public NExpression {
@@ -154,6 +127,7 @@ public:
     NBreak() { }
     NodeType type(){ return BREAK; }
     std::string type_str(){ return "BREAK"; }
+    virtual NBreak* clone() const { return new NBreak(*this); }
     NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
@@ -168,6 +142,7 @@ public:
     NBoolean(int trueVal) : trueVal(trueVal) { }
     NodeType type(){ return BOOLEAN; }
     std::string type_str(){ return "BOOLEAN"; }
+    virtual NBoolean* clone() const { return new NBoolean(*this); }
     NExpression* evaluate(CodeExecutionContext& context){ return this; }
 };
 
@@ -177,6 +152,7 @@ public:
     NInteger(long long value) : value(value) { }
     NodeType type(){ return INTEGER; }
     std::string type_str(){ return "INTEGER"; }
+    virtual NInteger* clone() const { return new NInteger(*this); }
     NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
@@ -186,6 +162,7 @@ public:
     NDouble(double value) : value(value) { }
     NodeType type(){ return DOUBLE; }
     std::string type_str(){ return "DOUBLE"; }
+    virtual NDouble* clone() const { return new NDouble(*this); }
     NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
@@ -195,6 +172,7 @@ public:
     NString(const std::string& value) : value(value) { }
     NodeType type(){ return STRING; }
     std::string type_str(){ return "STRING"; }
+    virtual NString* clone() const { return new NString(*this); }
     NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
@@ -204,6 +182,7 @@ public:
     NIdentifier(const std::string& name) : name(name) { }
     NodeType type(){ return IDENTIFIER; }
     std::string type_str(){ return "IDENTIFIER"; }
+    virtual NIdentifier* clone() const { return new NIdentifier(*this); }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -214,27 +193,9 @@ public:
         exprList(exprList) { }
     NodeType type(){ return EXPRESSION_LIST; }
     std::string type_str(){ return "EXPRESSION_LIST"; }
+    virtual NExpressionList* clone() const { return new NExpressionList(*this); }
     NExpression* evaluate(CodeExecutionContext& context);
 };
-
-/*
-    TODO:
-    Esto en verdad teoricamente puede recibir una lista
-    de identificadores secuenciales separados por un .
-    Para simplificar solo permitimos un nivel.
-    Es para hacer:
-        table.add()
-    Donde id    = 'add'
-          library = 'table'
-
-
-class NIdentifierMethod : public NIdentifier {
-public:
-    const NIdentifier& id;
-    const NIdentifier& library;
-    NIdentifierMethod(const NIdentifier& id, const NIdentifier& library) :
-        id(id), library(library) { }
-};*/
 
 class NFunctionCall : public NExpression {
 public:
@@ -245,6 +206,7 @@ public:
     NFunctionCall(NIdentifier& id) : id(id) { }
     NodeType type(){ return FUNCTION_CALL; }
     std::string type_str(){ return "FUNCTION_CALL"; }
+    virtual NFunctionCall* clone() const { return new NFunctionCall(*this); }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -257,6 +219,7 @@ public:
         op(op), lhs(lhs), rhs(rhs) { }
     NodeType type(){ return BINARY_OPERATOR; }
     std::string type_str(){ return "BINARY_OPERATOR"; }
+    virtual NBinaryOperator* clone() const { return new NBinaryOperator(*this); }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -268,6 +231,7 @@ public:
         rhs(rhs), op(op) { }
     NodeType type(){ return UNARY_OPERATOR; }
     std::string type_str(){ return "UNARY_OPERATOR"; }
+    virtual NUnaryOperator* clone() const { return new NUnaryOperator(*this); }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -281,6 +245,7 @@ public:
         expression(expression) {}
     NodeType type(){ return TABLE_FIELD_SINGLE_EXPRESSION; }
     std::string type_str(){ return "TABLE_FIELD_SINGLE_EXPRESSION"; }
+    virtual NTableFieldSingleExpression* clone() const { return new NTableFieldSingleExpression(*this); }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -292,6 +257,7 @@ public:
         identifier(identifier), expression(expression) {}
     NodeType type(){ return TABLE_FIELD_IDENTIFIER; }
     std::string type_str(){ return "TABLE_FIELD_IDENTIFIER"; }
+    virtual NTableFieldIdentifier* clone() const { return new NTableFieldIdentifier(*this); }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -304,6 +270,7 @@ public:
         keyExpr(keyExpr), valExpr(valExpr), auto_incremented(auto_incremented) {}
     NodeType type(){ return TABLE_FIELD_EXPRESSION; }
     std::string type_str(){ return "TABLE_FIELD_EXPRESSION"; }
+    virtual NTableFieldExpression* clone() const { return new NTableFieldExpression(*this); }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -314,7 +281,20 @@ public:
         fieldList(fieldList) {}
     NodeType type(){ return TABLE_FIELD_LIST; }
     std::string type_str(){ return "TABLE_FIELD_LIST"; }
+    virtual NTableFieldList* clone() const { return new NTableFieldList(*this); }
     NExpression* evaluate(CodeExecutionContext& context);
+};
+
+class NTableFieldKey : public NExpression {
+public:
+    NExpression& tableIdent;
+    NExpression& keyExpr;
+    NTableFieldKey(NExpression& tableIdent, NExpression& keyExpr) :
+        tableIdent(tableIdent), keyExpr(keyExpr) {}
+    NodeType type(){ return TABLE_FIELD_KEY; }
+    std::string type_str(){ return "TABLE_FIELD_KEY"; }
+    virtual NTableFieldKey* clone() const { return new NTableFieldKey(*this); }
+    NExpression* evaluate(CodeExecutionContext& context){ return this; };
 };
 
 class NTable : public NExpression {
@@ -324,6 +304,7 @@ public:
         fieldList(fieldList) {}
     NodeType type(){ return TABLE; }
     std::string type_str(){ return "TABLE"; }
+    virtual NTable* clone() const { return new NTable(*this); }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -334,6 +315,7 @@ public:
     NTableExpr() : counter(1) {};
     NodeType type(){ return TABLE_EXPRESSION; }
     std::string type_str(){ return "TABLE_EXPRESSION"; }
+    virtual NTableExpr* clone() const { return new NTableExpr(*this); }
     NExpression* evaluate(CodeExecutionContext& context) { return this; };
     void add_field(NExpression* valExpr);
     void add_field(NExpression* keyExpr, NExpression* valExpr, bool auto_incremented);
@@ -353,10 +335,10 @@ public:
 */
 class NMultiAssignment : public NStatement {
 public:
-    IdentifierList idList;
+    ExpressionList idList;
     ExpressionList expressionList;
     int isLocal;
-    NMultiAssignment(IdentifierList idList, ExpressionList expressionList, int isLocal) :
+    NMultiAssignment(ExpressionList idList, ExpressionList expressionList, int isLocal) :
         idList(idList), expressionList(expressionList), isLocal(isLocal) { }
     NodeType type(){ return MULTI_ASSIGNMENT; }
     std::string type_str(){ return "MULTI_ASSIGNMENT"; }
@@ -400,6 +382,7 @@ public:
     NExpression* runCode(CodeExecutionContext& context);
     NodeType type(){ return BLOCK; }
     std::string type_str(){ return "BLOCK"; }
+    virtual NBlock* clone() const { return new NBlock(*this); }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -444,20 +427,6 @@ public:
     NExpression* runCode(CodeExecutionContext& context);
 };
 
-/*
-TODO: No se usa al final?
-class NMultiVariableDeclaration : public NStatement {
-public:
-    IdentifierList idList;
-    int isLocal;
-    NMultiVariableDeclaration(int isLocal, IdentifierList& idList):
-        isLocal(isLocal), idList(idList) { }
-    NodeType type(){ return MULTI_VARIABLE_DECLARATION; }
-    std::string type_str(){ return "MULTI_VARIABLE_DECLARATION"; }
-    NExpression* runCode(CodeExecutionContext& context);
-
-};*/
-
 class NVariableDeclaration : public NStatement {
 public:
     NIdentifier& id;
@@ -482,10 +451,10 @@ public:
 */
 class NForLoopIn : public NStatement {
 public:
-    IdentifierList nameList;
+    ExpressionList nameList;
     ExpressionList expressionList;
     NBlock& block;
-    NForLoopIn(IdentifierList nameList, ExpressionList expressionList, NBlock& block) :
+    NForLoopIn(ExpressionList nameList, ExpressionList expressionList, NBlock& block) :
         nameList(nameList), expressionList(expressionList), block(block) { }
     NodeType type(){ return FOR_LOOP_IN; }
     std::string type_str(){ return "FOR_LOOP_IN"; }
@@ -526,12 +495,13 @@ public:
 */
 class NAnonFunctionDeclaration : public NExpression {
 public:
-    IdentifierList arguments;
+    ExpressionList arguments;
     NBlock& block;
-    NAnonFunctionDeclaration(IdentifierList& arguments, NBlock& block) :
+    NAnonFunctionDeclaration(ExpressionList& arguments, NBlock& block) :
         arguments(arguments), block(block) { }
     NodeType type(){ return ANON_FUNCTION_DECLARATION; }
     std::string type_str(){ return "ANON_FUNCTION_DECLARATION"; }
+    virtual NAnonFunctionDeclaration* clone() const { return new NAnonFunctionDeclaration(*this); }
     NExpression* evaluate(CodeExecutionContext& context);
 };
 
@@ -547,9 +517,9 @@ public:
 class NFunctionDeclaration : public NStatement {
 public:
     NIdentifier& id;
-    IdentifierList arguments;
+    ExpressionList arguments;
     NBlock& block;
-    NFunctionDeclaration(NIdentifier& id, IdentifierList& arguments, NBlock& block) :
+    NFunctionDeclaration(NIdentifier& id, ExpressionList& arguments, NBlock& block) :
         id(id), arguments(arguments), block(block) { }
     NodeType type(){ return FUNCTION_DECLARATION; }
     std::string type_str(){ return "FUNCTION_DECLARATION"; }

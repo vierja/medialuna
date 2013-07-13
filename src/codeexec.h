@@ -27,6 +27,8 @@ public:
     */
     map<string, NExpression*> variables;
     map<string, NFunctionDeclaration*> functions;
+
+    ~CodeExecutionBlock();
 };
 
 class CodeExecutionContext {

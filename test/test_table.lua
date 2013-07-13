@@ -37,3 +37,11 @@ print(the_universe)
 
 print("Count",  "The Factors of Life, the Universe, and Everything")
 table.foreach(factors_of_the_universe, print)
+
+for i, j in pairs(factors_of_the_universe) do
+    print(i, j)
+end
+
+for i in pairs(factors_of_the_universe) do
+    print("Value:" .. i)
+end

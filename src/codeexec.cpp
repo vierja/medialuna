@@ -6,6 +6,16 @@
 
 using namespace std;
 
+CodeExecutionBlock::~CodeExecutionBlock(void){
+    return;
+    for (map<string, NFunctionDeclaration*>::iterator it2=this->functions.begin(); it2!=this->functions.end(); ++it2){
+        delete it2->second;
+    }
+    for (map<string, NExpression*>::iterator it2=this->variables.begin(); it2!=this->variables.end(); ++it2){
+        delete it2->second;
+    }
+}
+
 void* CodeExecutionContext::executeCode(NBlock& root){
 
     /*
@@ -32,7 +42,9 @@ void CodeExecutionContext::push_block(CodeExecutionBlock* ceb){
     this->blocks.push_back(ceb);
 }
 void CodeExecutionContext::pop_block(){
+    CodeExecutionBlock* back = this->blocks.back();
     this->blocks.pop_back();
+    delete back;
 }
 
 NExpression* CodeExecutionContext::getVariable(string name){
@@ -325,6 +337,7 @@ NExpression* CodeExecutionContext::table(string method, ExpressionList exprList)
         ExpressionList::iterator expr_it = exprListExpanded->begin();
         expr_it++;
         NExpression* valExpr = *expr_it;
+        DEBUG_PRINT((BOLDCYAN"Se inserta un valor de tipo: %s\n"RESET, valExpr->type_str().c_str()));
         tableExpr->add_field(valExpr);
 
     } else if (method.compare("sort") == 0) {

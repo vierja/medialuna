@@ -68,12 +68,12 @@
 
 %type <block> block
 %type <statvec> scope statlist
-%type <ident> identifier var /* var puede ser table pero todavia no lo consideramos */
+%type <ident> identifier
 %type <stmt> stat /*repetition*/ binding
 %type <laststat> laststat
-%type <idvec> namelist params setlist parlist
-%type <expvec> explist1 explist23 args /* args es mas pero todavia no lo consideramos. */
-%type <expr> exp function functioncal tableconstr prefixexp/* prefixexp es mas que esto pero la parte de tables todavia no lo consideramos. */
+//%type <idvec> 
+%type <expvec> explist1 explist23 setlist namelist parlist params args /* args es mas pero todavia no lo consideramos. */
+%type <expr> exp function functioncal var tableconstr prefixexp/* prefixexp es mas que esto pero la parte de tables todavia no lo consideramos. */
 %type <condvec> condlist conds
 %type <ifcond> cond
 %type <tablfields> fieldlist
@@ -169,21 +169,19 @@ statlist    : { $$ = new StatementList(); /* Creo una lista vacia */ }
 identifier  : TK_ID
             {
                 $$ = new NIdentifier(*$1);
-                delete $1; /* TODO : Porque delete? */
+                delete $1;
             }
 
 stat        : TK_KW_FOR identifier TK_OP_ASSIGN explist23 TK_KW_DO block TK_KW_END
             {
                 $$ = new NForLoopAssign(*$2, *$4, *$6);
             }
-            /* No es obligatorio
             | TK_KW_FOR namelist TK_KW_IN explist1 TK_KW_DO block TK_KW_END
             {
                 $$ = new NForLoopIn(*$2, *$4, *$6);
-            } */
+            }
             | TK_KW_IF conds TK_KW_END
             {
-                /* TODO: Complicado */
                 $$ = new NIf(*$2);
             }
             | TK_KW_FUNCTION identifier params block TK_KW_END
@@ -288,7 +286,7 @@ binding     : TK_KW_LOCAL namelist
 namelist    : identifier
             {
                 /* inicio de lista, minimo un identifier */
-                $$ = new IdentifierList();
+                $$ = new ExpressionList();
                 $$->push_back($1);
             }
             | namelist TK_OP_COMA identifier
@@ -312,10 +310,6 @@ explist1    : exp
 
 explist23   : exp TK_OP_COMA exp
             {
-                /*
-                    TODO: Ver si es necesario crear un nuevo nodo o si esta bien
-                    usar una lista normal y saber que tiene largo 2 o 3.
-                */
                 $$ = new ExpressionList();
                 $$->push_back($1);
                 $$->push_back($3);
@@ -366,7 +360,6 @@ exp         : TK_KW_NIL
             }
             | prefixexp
             {
-                /* TODO : Complicado */
                 $$ = $1;
             }
             | tableconstr
@@ -449,7 +442,7 @@ exp         : TK_KW_NIL
 
 setlist     : var
             {
-                $$ = new IdentifierList();
+                $$ = new ExpressionList();
                 $$->push_back($1);
             }
             | setlist TK_OP_COMA var
@@ -465,6 +458,7 @@ var         : identifier
             | prefixexp TK_OP_OPEN_BRACK exp TK_OP_CLOS_BRACK
             {
                 /* Falta manejo de tablas. */
+                $$ = new NTableFieldKey(*$1, *$3);
             }
             | identifier TK_OP_DOT identifier
             {
@@ -497,7 +491,6 @@ prefixexp   : var
             {
                 
                 // exp obviamente es de tipo NExpresion, pueden ser varios.
-                
                 $$ = $2
             }
             ;
@@ -583,7 +576,7 @@ params      : TK_OP_OPEN_PAREN parlist TK_OP_CLOS_PAREN
 
 parlist     : /* vacio */
             {
-                $$ = new IdentifierList(); /* lista vacia */
+                $$ = new ExpressionList(); /* lista vacia */
             }
             | namelist
             {

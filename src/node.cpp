@@ -66,10 +66,9 @@ NExpression* NMultiAssignment::runCode(CodeExecutionContext& context) {
         int isLocal;
     */
 
-    IdentifierList::const_iterator id_it;
+    ExpressionList::const_iterator id_it;
     ExpressionList::const_iterator exp_it = expressionList.begin();
     for (id_it = idList.begin(); id_it != idList.end(); id_it++){
-        string varName = (**id_it).name;
         NExpression* varExpression;
         if (exp_it != expressionList.end()){
             DEBUG_PRINT((RED"Variable con expression de tipo %s. Se evalua.\n"RESET, (*exp_it)->type_str().c_str()));
@@ -81,9 +80,28 @@ NExpression* NMultiAssignment::runCode(CodeExecutionContext& context) {
             DEBUG_PRINT((RED"Variable sin expression. Se setea como null."RESET));
             varExpression = new NNil();
         }
-        DEBUG_PRINT(("Se declara la variable %s\n",varName.c_str()));
-        context.addVariable(varName, varExpression, isLocal);
-        DEBUG_PRINT((YELLOW"Variable %s declarada\n"RESET, varName.c_str()));
+
+        /*
+            El ID que es una expression puede ser: NTableFieldKey, NIdentifier (comun o con un ".", ej: math.sqrt), 
+            si es NTableField entonces el prefixexp puede ser recursivo, function, o nose.
+        */
+        if ((*id_it)->type() == IDENTIFIER) {
+            NIdentifier* nIdent = dynamic_cast<NIdentifier*>(*id_it);
+            string varName = nIdent->name;
+
+            DEBUG_PRINT(("Se declara la variable %s\n",varName.c_str()));
+            context.addVariable(varName, varExpression, isLocal);
+            DEBUG_PRINT((YELLOW"Variable %s declarada\n"RESET, varName.c_str()));
+        } else if ((*id_it)->type() == TABLE_FIELD_KEY) {
+            NTableFieldKey* nTblKey = dynamic_cast<NTableFieldKey*>(*id_it);
+            if (nTblKey->tableIdent.type() != IDENTIFIER) {
+                cout << "ERROR: Multiassignment con tablas no esta implementado todavia.\n";
+                exit(0);    
+            }
+
+            NTableExpr* tableExpr = dynamic_cast<NTableExpr*>(nTblKey->tableIdent.evaluate(context));
+            tableExpr->add_field(nTblKey->keyExpr.evaluate(context), varExpression, false);
+        }
 
         if (exp_it != expressionList.end()){
             exp_it++;
@@ -186,8 +204,103 @@ NExpression* NLastStatement::runCode(CodeExecutionContext& context) {
 
 NExpression* NForLoopIn::runCode(CodeExecutionContext& context) {
     /*
-        No es obligatorio, se deja para despues.
+        Solo se realiza para iterar sobre las tables usando la funcion pairs e ipairs.
+        Los valores de la nameList tiene que tener tamaño 2 y ser NIdentifiers.
     */
+
+    if (nameList.size() > 2 || nameList.size() == 0 || expressionList.size() != 1) {
+        cout << "ERROR: Loop for in very limited, only available for iterating tables.\n";
+        exit(0);
+    }
+
+    NExpression* firstExpr = expressionList[0];
+    if (firstExpr->type() != FUNCTION_CALL) {
+        cout << "ERROR: Invalid second argument, only function call allowed.\n";
+        exit(0);
+    }
+    NFunctionCall* tableIterFunc = dynamic_cast<NFunctionCall*>(firstExpr);
+
+    if ((tableIterFunc->id.name.compare("pairs") != 0 && tableIterFunc->id.name.compare("ipairs") != 0) || tableIterFunc->arguments.size() != 1) {
+        cout << "ERROR: Invalid second argument for function call, only pairs or ipairs allowed.\n";
+        exit(0);   
+    }
+
+    bool iterateIPairs = false;
+    if (tableIterFunc->id.name.compare("ipairs") == 0){
+        iterateIPairs = true;
+    }
+
+    NTableExpr* tableExpr = dynamic_cast<NTableExpr*>(tableIterFunc->arguments[0]->evaluate(context));
+
+    if (nameList[0]->type() != IDENTIFIER) {
+        cout << "ERROR: Invalid name identifier in for loop.\n";
+        exit(0);
+    }
+    NIdentifier* firstName = dynamic_cast<NIdentifier*>(nameList[0]);
+    NIdentifier* secondName;
+    bool secondValue = false;
+    if (nameList.size() == 2) {
+        if (nameList[0]->type() != IDENTIFIER) {
+            cout << "ERROR: Invalid name identifier in for loop.\n";
+            exit(0);
+        }
+        secondName = dynamic_cast<NIdentifier*>(nameList[1]);
+        secondValue = true;
+    }
+
+    int blockReturned = 0;
+    int blockBreaked = 0;
+    int loopEndend = 0;
+    int forCount = 0;
+    NExpression* forReturn;
+
+    TableFieldList::const_iterator tf_it;
+    for (tf_it = tableExpr->fieldList->begin(); tf_it != tableExpr->fieldList->end(); tf_it++) {
+        // it es de tipo NTableFieldExpression
+        // NExpression& keyExpr;
+        // NExpression& valExpr;
+
+        NExpression* keyExpr = (*tf_it)->keyExpr.evaluate(context);
+        if (iterateIPairs && keyExpr->type() != INTEGER) {
+            forCount++;
+            continue;
+        }
+
+        CodeExecutionBlock* forBlock = new CodeExecutionBlock(block);
+        context.push_block(forBlock);
+
+        context.addVariable(firstName->name, keyExpr, 1);
+        if (secondValue) {
+            NExpression* valExpr = (*tf_it)->valExpr.evaluate(context);
+            context.addVariable(secondName->name, valExpr, 1);
+        }
+
+        DEBUG_PRINT((BOLDGREEN"Se ejecuta el bloque del forin num: %d .\n"RESET, forCount++));
+        NExpression* res = block.runCode(context);
+        DEBUG_PRINT((BOLDGREEN"Se termina de ejecutar bloque del forin.\n"RESET));
+
+        if (res->type() == BREAK) {
+            blockBreaked = 1;
+            break;
+        } else if (res->type() != NIL) {
+            // Si el restul es distinto de nil entonces retorna ALGO.
+            forReturn = res;
+            blockReturned = 1;
+            break;
+        } // el es NIL entonces sigue normal.
+
+        context.pop_block();
+
+    }
+
+    if (blockReturned == 1){
+        // Se guarda el return en forReturnList
+        return forReturn;
+    }
+
+    // else
+    return new NNil();
+
 }
 
 NExpression* NForLoopAssign::runCode(CodeExecutionContext& context) {
@@ -405,11 +518,14 @@ NExpression* NFunctionCall::evaluate(CodeExecutionContext& context){
     // Todos las variables que se agreguen se hace como locales.
 
     int var_count = 0;
-    IdentifierList::const_iterator id_it;
+    ExpressionList::const_iterator id_it;
     ExpressionList::const_iterator exp_it = arguments.begin();
     for (id_it = funcDecl->arguments.begin(); id_it != funcDecl->arguments.end(); id_it++){
+
+        //TODO Manejo de tablas como argumentos.
+        NIdentifier* nIdent = dynamic_cast<NIdentifier*>(*id_it);
         var_count++;
-        string varName = (**id_it).name;
+        string varName = nIdent->name;
         NExpression* varExpression;
         if (exp_it != arguments.end()){
             // Si es una funcion entonces tengo que evaluarla.
@@ -434,10 +550,11 @@ NExpression* NFunctionCall::evaluate(CodeExecutionContext& context){
     res = res->evaluate(context);
     DEBUG_PRINT((MAGENTA"Res evaluado, ahora es de tipo: %s.\n"RESET, res->type_str().c_str()));
 
+    NExpression* resCopy = res->clone();
     // Quito el bloque de la funcion del contexto.
     context.pop_block();
 
-    return res;
+    return resCopy;
 }
 
 NExpression* NBinaryOperator::evaluate(CodeExecutionContext& context){
@@ -1050,11 +1167,14 @@ NExpression* NTable::evaluate(CodeExecutionContext& context){
 
     */
 
+    DEBUG_PRINT((GREEN"Se evalua NTable\n"RESET));
+
     int countSinKey = 1; // Los que no tienen indice se empiezan a contar desde 1.
     TableFieldList* normalTableFieldList = new TableFieldList();
 
     GenericTableFieldList::const_iterator tf_it;
     for (tf_it = fieldList.fieldList.begin(); tf_it != fieldList.fieldList.end(); tf_it++) {
+        DEBUG_PRINT((BOLDGREEN"Field es de tipo: %s\n"RESET, (*tf_it)->type_str().c_str()));
         if ((*tf_it)->type() == TABLE_FIELD_SINGLE_EXPRESSION) {
 
             NTableFieldSingleExpression* tablFieldSingleExpr = dynamic_cast<NTableFieldSingleExpression*>(*tf_it);
@@ -1070,15 +1190,14 @@ NExpression* NTable::evaluate(CodeExecutionContext& context){
 
             NTableFieldIdentifier* tablFieldIdenExpr = dynamic_cast<NTableFieldIdentifier*>(*tf_it);
 
-            // Se busca el Identifier en el contexto, y se evalua.
-
-            NExpression* keyExpr = tablFieldIdenExpr->identifier.evaluate(context);
+            // El Identifier se como string, se evalua la expression.
+            NExpression* keyExpr = new NString(tablFieldIdenExpr->identifier.name);
             NExpression* valExpr = tablFieldIdenExpr->expression.evaluate(context);
             NTableFieldExpression* evaluated = new NTableFieldExpression(*keyExpr, *valExpr, false);
 
             normalTableFieldList->push_back(evaluated);
 
-        } else if ((*tf_it)->type() == TABLE_FIELD_LIST) {
+        } else if ((*tf_it)->type() == TABLE_FIELD_EXPRESSION) {
 
             NTableFieldExpression* tablFieldExpr = dynamic_cast<NTableFieldExpression*>(*tf_it);
 
@@ -1096,6 +1215,7 @@ NExpression* NTable::evaluate(CodeExecutionContext& context){
 
     //TODO: Falta no agregar duplicados.
     NTableExpr* evalTable = new NTableExpr();
+    evalTable->counter = countSinKey;
     evalTable->fieldList = normalTableFieldList;
     return evalTable;
 }
