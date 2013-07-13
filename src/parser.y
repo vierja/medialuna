@@ -11,7 +11,6 @@
 
 
 %union {
-    Node *node;
     NBlock *block;
     NExpression *expr;
     NStatement *stmt;

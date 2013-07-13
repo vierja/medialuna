@@ -84,12 +84,7 @@ typedef std::vector<NIfCond*> ConditionList;
 typedef std::vector<NTableField*> GenericTableFieldList;
 typedef std::vector<NTableFieldExpression*> TableFieldList;
 
-class Node {
-public:
-    virtual ~Node() {}
-};
-
-class NExpression : public Node {
+class NExpression {
 public:
     virtual NodeType type() { return EXPRESSION; };
     virtual std::string type_str() { return "EXPRESSION"; };
@@ -97,7 +92,7 @@ public:
     virtual NExpression* clone() const = 0;
 };
 
-class NStatement : public Node {
+class NStatement {
 public:
     virtual NExpression* runCode(CodeExecutionContext& context) = 0;
 };
