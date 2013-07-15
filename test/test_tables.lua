@@ -28,6 +28,9 @@ t = {"a", "c"}
 table.insert(t, "b")
 print("********")
 table.foreach(t, print)
+table.remove(t, 1)
+print("********")
+table.foreach(t, print)
 print("********")
 for i, v in pairs(t) do print(i, v) end
 for i in pairs(t) do print(i) end
